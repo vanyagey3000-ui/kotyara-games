@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Лобби — KotyaraGames{% endblock %}
+
+{% block content %}
+<div class="lobby-container">
+    <div class="lobby-header">
+        <h1>⚡ Найти матч</h1>
+        <p>Выбери режим и сразись!</p>
+    </div>
+
+    <div class="player-card-lobby">
+        <div class="pcl-avatar">
+            {% set av = image_url(current_user.active_skin ~ '_ui') %}
+            {% if av %}
+                <img src="{{ av }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
+            {% else %}
+                🐱
+            {% endif %}
+        </div>
+        <div class="pcl-info">
+            <h2>{{ current_user.username }}</h2>
+            <div class="pcl-rank" style="color: {{ current_user.rank_color }}">
+                {{ current_user.rank_title }} — {{ current_user.elo }} ELO
+            </div>
+            <div class="pcl-stats-mini">
+                {{ current_user.wins }}W / {{ current_user.losses }}L · {{ current_user.winrate }}% WR
+            </div>
+        </div>
+    </div>
+
+    <!-- Выбор режима -->
+    <div class="mode-selector" id="mode-selector">
+        <h3 style="text-align:center;margin-bottom:14px;font-weight:800">Режим игры</h3>
+        <div class="mode-buttons">
+            <button class="mode-btn mode-active" data-mode="1v1" onclick="selectMode('1v1', this)">
+                <span class="mode-icon">⚔️</span>
+                <span class="mode-name">1 × 1</span>
+                <span class="mode-desc">Классика</span>
+            </button>
+            <button class="mode-btn" data-mode="2v2" onclick="selectMode('2v2', this)">
+                <span class="mode-icon">👥</span>
+                <span class="mode-name">2 × 2</span>
+                <span class="mode-desc">Командный</span>
+            </button>
+            <button class="mode-btn" data-mode="5v5" onclick="selectMode('5v5', this)">
+                <span class="mode-icon">🏟️</span>
+                <span class="mode-name">5 × 5</span>
+                <span class="mode-desc">Хаос!</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="search-section" id="search-section">
+        <button class="btn-search" id="btn-find-match" onclick="findMatch()">
+            🎯 Найти соперника
+        </button>
+
+        <div class="search-status" id="search-status" style="display: none">
+            <div class="search-spinner"><div class="spinner"></div></div>
+            <div class="search-info">
+                <span class="search-label">Поиск <span id="search-mode-label">1v1</span>...</span>
+                <span class="search-timer" id="search-timer">0:00</span>
+            </div>
+            <button class="btn-cancel" onclick="cancelSearch()">Отмена</button>
+        </div>
+    </div>
+
+    <div class="match-found-overlay" id="match-found" style="display: none">
+        <div class="match-found-card">
+            <h2>⚔️ Матч найден!</h2>
+            <div class="mf-players">
+                <div class="mf-player">
+                    <span class="mf-name">{{ current_user.username }}</span>
+                    <span class="mf-elo" style="color: {{ current_user.rank_color }}">{{ current_user.elo }}</span>
+                </div>
+                <span class="mf-vs">VS</span>
+                <div class="mf-player">
+                    <span class="mf-name" id="opponent-name">???</span>
+                    <span class="mf-elo" id="opponent-elo">???</span>
+                </div>
+            </div>
+            <p class="mf-loading">Загрузка...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var selectedMode = '1v1';
+var isSearching = false;
+var searchStart = null;
+var searchInterval = null;
+
+function selectMode(mode, btn) {
+    selectedMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('mode-active'); });
+    btn.classList.add('mode-active');
+}
+
+function findMatch() {
+    if (isSearching) return;
+    isSearching = true;
+    document.getElementById('btn-find-match').style.display = 'none';
+    document.getElementById('mode-selector').style.display = 'none';
+    document.getElementById('search-status').style.display = 'flex';
+    document.getElementById('search-mode-label').textContent = selectedMode;
+    searchStart = Date.now();
+    searchInterval = setInterval(function() {
+        var el = Math.floor((Date.now() - searchStart) / 1000);
+        var m = Math.floor(el / 60);
+        var s = el % 60;
+        document.getElementById('search-timer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 1000);
+    window.socket.emit('find_match', { mode: selectedMode });
+}
+
+function cancelSearch() {
+    isSearching = false;
+    clearInterval(searchInterval);
+    document.getElementById('btn-find-match').style.display = '';
+    document.getElementById('mode-selector').style.display = '';
+    document.getElementById('search-status').style.display = 'none';
+    window.socket.emit('cancel_search');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (!window.socket) return;
+    window.socket.on('match_found', function(data) {
+        clearInterval(searchInterval);
+        isSearching = false;
+        document.getElementById('match-found').style.display = 'flex';
+        document.getElementById('opponent-name').textContent = data.opponent;
+        document.getElementById('opponent-elo').textContent = data.opponent_elo + ' ELO';
+        setTimeout(function() { window.location.href = '/game/' + data.room_id; }, 2000);
+    });
+});
+</script>
+{% endblock %}

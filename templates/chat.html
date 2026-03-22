@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Чат — KotyaraGames{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <h1 style="text-align:center;font-weight:900;color:var(--red);margin-bottom:16px">💬 Общий чат</h1>
+
+    <div class="chat-box" id="chat-box">
+        {% for msg in messages %}
+        <div class="chat-msg">
+            <span class="chat-time">{{ msg.created_at.strftime('%H:%M') }}</span>
+            <a href="{{ url_for('profile', user_id=msg.user_id) }}" class="chat-name">{{ msg.username }}</a>
+            <span class="chat-text">{{ msg.message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-input-form" id="chat-form" onsubmit="sendChatMsg(event)">
+        <input type="text" id="chat-input" placeholder="Написать сообщение..." maxlength="500" autocomplete="off" required>
+        <button type="submit" class="btn btn-primary" style="padding:10px 20px">Отправить</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function sendChatMsg(e) {
+    e.preventDefault();
+    var inp = document.getElementById('chat-input');
+    var msg = inp.value.trim();
+    if (!msg) return;
+    if (window.socket) {
+        window.socket.emit('chat_message', { message: msg });
+    }
+    inp.value = '';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (!window.socket) return;
+
+    window.socket.on('new_chat_message', function(data) {
+        var box = document.getElementById('chat-box');
+        var div = document.createElement('div');
+        div.className = 'chat-msg chat-msg-new';
+        div.innerHTML = '<span class="chat-time">' + data.time + '</span>' +
+            '<a href="/profile/' + data.user_id + '" class="chat-name">' + data.username + '</a>' +
+            '<span class="chat-text">' + escapeHtml(data.message) + '</span>';
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    });
+
+    var box = document.getElementById('chat-box');
+    box.scrollTop = box.scrollHeight;
+});
+
+function escapeHtml(t) {
+    var d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ user.username }} — Профиль{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="profile-avatar" style="background: {{ user.rank_color }}22; border-color: {{ user.rank_color }}">
+            {% set avatar_img = image_url(user.active_skin ~ '_ui') %}
+            {% if avatar_img %}
+                <img src="{{ avatar_img }}" alt="{{ user.active_skin }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
+            {% else %}
+                {% if user.active_skin == 'kompot' %}🐱
+                {% elif user.active_skin == 'karamelka' %}🎀
+                {% elif user.active_skin == 'korzhik' %}⚽
+                {% else %}🐱{% endif %}
+            {% endif %}
+        </div>
+        <div class="profile-info">
+            <h1 class="profile-name">{{ user.username }}</h1>
+            <div class="profile-rank">
+                <span class="rank-badge-lg" style="background: {{ user.rank_color }}20; color: {{ user.rank_color }}; border-color: {{ user.rank_color }}">
+                    {{ user.rank_title }}
+                </span>
+                <span class="profile-elo" style="color: {{ user.rank_color }}">{{ user.elo }} ELO</span>
+            </div>
+            <p class="profile-member">С {{ user.created_at.strftime('%d.%m.%Y') }}</p>
+        </div>
+        <div class="profile-currency">
+            <div class="currency-item">
+                <span class="currency-icon">🪙</span>
+                <span class="currency-amount">{{ user.coins }}</span>
+                <span class="currency-label">Монеты</span>
+            </div>
+            <div class="currency-item">
+                <span class="currency-icon">💎</span>
+                <span class="currency-amount">{{ user.gems }}</span>
+                <span class="currency-label">Гемы</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">{{ user.total_games }}</div><div class="stat-name">Игр</div></div>
+        <div class="stat-card stat-win"><div class="stat-value">{{ user.wins }}</div><div class="stat-name">Побед</div></div>
+        <div class="stat-card stat-loss"><div class="stat-value">{{ user.losses }}</div><div class="stat-name">Поражений</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.winrate }}%</div><div class="stat-name">Винрейт</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.peak_elo }}</div><div class="stat-name">Пик ELO</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.best_streak }}</div><div class="stat-name">Лучшая серия</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.goals_scored }}</div><div class="stat-name">Голов</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.kd_ratio }}</div><div class="stat-name">K/D голов</div></div>
+    </div>
+
+    <div class="elo-progress-section">
+        <h2>Прогресс ранга</h2>
+        {% set ranks = [
+            ('Новичок', 0, 800, '#888888'),
+            ('Бронза', 800, 1000, '#cc8844'),
+            ('Серебро', 1000, 1200, '#cccccc'),
+            ('Золото', 1200, 1400, '#ffdd44'),
+            ('Платина', 1400, 1700, '#44ffaa'),
+            ('Алмаз', 1700, 2000, '#44ddff'),
+            ('Мастер', 2000, 2400, '#aa44ff'),
+            ('Легенда', 2400, 3000, '#ff4444')
+        ] %}
+        {% for name, min_elo, max_elo, color in ranks %}
+            {% if user.elo >= min_elo and user.elo < max_elo %}
+                {% set progress = ((user.elo - min_elo) / (max_elo - min_elo)) * 100 %}
+                <div class="elo-bar-label">
+                    <span>{{ name }} ({{ min_elo }})</span>
+                    <span>{{ user.elo }} / {{ max_elo }}</span>
+                </div>
+                <div class="elo-bar">
+                    <div class="elo-bar-fill" style="width: {{ progress }}%; background: {{ color }}"></div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="matches-section">
+        <h2>📜 Последние матчи</h2>
+        {% if matches %}
+        <div class="matches-list">
+            {% for m in matches %}
+            <div class="match-card {{ 'match-win' if m.won else 'match-loss' }}">
+                <div class="match-result">
+                    <span class="match-badge {{ 'win' if m.won else 'loss' }}">{{ 'W' if m.won else 'L' }}</span>
+                </div>
+                <div class="match-info">
+                    <span class="match-vs">vs <a href="{{ url_for('profile', user_id=m.opponent_id) }}">{{ m.opponent }}</a></span>
+                    <span class="match-score">{{ m.my_score }} : {{ m.opp_score }}</span>
+                </div>
+                <div class="match-elo">
+                    <span class="{{ 'elo-up' if m.elo_change > 0 else 'elo-down' }}">
+                        {{ '+' if m.elo_change > 0 else '' }}{{ m.elo_change }}
+                    </span>
+                </div>
+                <div class="match-coins">🪙 +{{ m.coins }}</div>
+                <div class="match-date">{{ m.date.strftime('%d.%m %H:%M') if m.date else '' }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>Нет матчей. Время играть! 🚀</p>
+            <a href="{{ url_for('lobby') }}" class="btn btn-primary">Найти матч</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

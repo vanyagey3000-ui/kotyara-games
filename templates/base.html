@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}KotyaraGames{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <a href="{{ url_for('index') }}" class="nav-logo">
+                {% set logo_img = image_url('korzhik_ui') %}
+                {% if logo_img %}
+                    <img src="{{ logo_img }}" alt="Logo" style="width:32px;height:32px;border-radius:50%;border:2px solid #1a1a2e">
+                {% else %}
+                    <span class="logo-icon">🏒</span>
+                {% endif %}
+                <span class="logo-text">KotyaraGames</span>
+            </a>
+            <div class="nav-links">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('lobby') }}" class="nav-btn-play">⚡ Играть</a>
+                    <a href="{{ url_for('shop') }}" class="nav-link">🛒 Магазин</a>
+                    <a href="{{ url_for('chat_page') }}" class="nav-link">💬 Чат</a>
+                    <a href="{{ url_for('profile') }}" class="nav-link">
+                        {% set nav_av = image_url(current_user.active_skin ~ '_ui') %}
+                        {% if nav_av %}
+                            <img src="{{ nav_av }}" alt="" style="width:22px;height:22px;border-radius:50%;border:2px solid #1a1a2e;vertical-align:middle;margin-right:4px">
+                        {% else %}
+                            👤
+                        {% endif %}
+                        {{ current_user.username }}
+                    </a>
+                    <a href="{{ url_for('settings') }}" class="nav-link">⚙️</a>
+                    <div class="nav-stats">
+                        <span class="nav-elo" style="color: {{ current_user.rank_color }}">⭐ {{ current_user.elo }}</span>
+                        <span class="nav-coins">🪙 {{ current_user.coins }}</span>
+                        <span class="nav-gems">💎 {{ current_user.gems }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="nav-link nav-logout">Выход</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="nav-link">Вход</a>
+                    <a href="{{ url_for('register') }}" class="nav-btn-play">Регистрация</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">
+                    {{ message }}
+                    <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+                </div>
+            {% endfor %}
+        {% endwith %}
+    </div>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <span>🐱 KotyaraGames © 2026 · <a href="https://t.me/kotayragames" target="_blank" style="color:var(--blue)">Telegram</a></span>
+            <span class="online-indicator">
+                <span class="online-dot"></span>
+                Онлайн: <span id="online-count">0</span>
+            </span>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

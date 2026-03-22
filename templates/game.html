@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Матч — Три Кота{% endblock %}
+
+{% block head %}
+<style>
+    .navbar, .footer { display: none; }
+    body { overflow: hidden; }
+    .main-content { padding: 0; margin: 0; max-width: 100%; height: 100vh; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="game-container" id="game-container">
+    <div class="game-hud">
+        <div class="hud-player hud-p1">
+            <span class="hud-name" id="hud-p1-name">Игрок 1</span>
+            <span class="hud-elo" id="hud-p1-elo">1000</span>
+        </div>
+        <div class="hud-center">
+            <div class="hud-score">
+                <span class="score-num" id="score-p1">0</span>
+                <span class="score-sep">:</span>
+                <span class="score-num" id="score-p2">0</span>
+            </div>
+            <div class="hud-timer" id="game-timer">0:00</div>
+        </div>
+        <div class="hud-player hud-p2">
+            <span class="hud-name" id="hud-p2-name">Игрок 2</span>
+            <span class="hud-elo" id="hud-p2-elo">1000</span>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div class="countdown-overlay" id="countdown-overlay" style="display:none">
+        <div class="countdown-num" id="countdown-num">3</div>
+    </div>
+
+    <div class="result-overlay" id="result-overlay" style="display:none">
+        <div class="result-card">
+            <h1 id="result-title">Победа!</h1>
+            <div class="result-score">
+                <span id="result-score-p1">0</span> : <span id="result-score-p2">0</span>
+            </div>
+            <div class="result-details">
+                <div class="result-elo" id="result-elo">+25 ELO</div>
+                <div class="result-coins" id="result-coins">+150 🪙</div>
+                <div class="result-rank" id="result-rank">Серебро</div>
+            </div>
+            <div class="result-buttons">
+                <a href="{{ url_for('lobby') }}" class="btn btn-primary">Ещё матч</a>
+                <a href="{{ url_for('profile') }}" class="btn btn-secondary">Профиль</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="waiting-overlay" id="waiting-overlay">
+        <div class="waiting-card">
+            <div class="spinner"></div>
+            <p>Подключение к матчу...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const ROOM_ID = '{{ room_id }}';
+
+    // Картинки скинов (серверный путь к обработанным)
+    const SKIN_IMAGES = {{ skin_images | tojson }};
+    const BG_IMAGE_URL = {{ (bg_url or 'null') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/game.js') }}"></script>
+{% endblock %}

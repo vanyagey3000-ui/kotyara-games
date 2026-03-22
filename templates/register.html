@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Регистрация — Три Кота{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <span class="auth-icon">🐱</span>
+            <h1>Регистрация</h1>
+            <p>Присоединяйся к Трём Котам!</p>
+        </div>
+
+        <form method="POST" class="auth-form" id="register-form">
+            <div class="form-group">
+                <label for="username">Имя игрока</label>
+                <input type="text" id="username" name="username" placeholder="Твой никнейм"
+                       minlength="3" maxlength="20" required
+                       value="{{ request.form.get('username', '') }}">
+                <span class="form-hint">3-20 символов</span>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="mail@example.com" required
+                       value="{{ request.form.get('email', '') }}">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" name="password" placeholder="Минимум 6 символов"
+                       minlength="6" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password2">Повтори пароль</label>
+                <input type="password" id="password2" name="password2" placeholder="Ещё раз" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">
+                🎮 Создать аккаунт
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a>
+        </div>
+
+        <div class="auth-bonus">
+            <span>🎁</span> Бонус за регистрацию: <strong>500 монет</strong> + <strong>3 бесплатных скина!</strong>
+        </div>
+    </div>
+</div>
+{% endblock %}

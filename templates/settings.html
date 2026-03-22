@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Настройки — KotyaraGames{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card" style="max-width:480px">
+        <div class="auth-header">
+            <span class="auth-icon">⚙️</span>
+            <h1>Настройки</h1>
+        </div>
+
+        <h3 style="margin-bottom:12px;font-weight:800">Изменить никнейм</h3>
+        <form method="POST" class="auth-form" style="margin-bottom:28px">
+            <input type="hidden" name="action" value="change_username">
+            <div class="form-group">
+                <label>Новый никнейм</label>
+                <input type="text" name="new_username" placeholder="3-20 символов" minlength="3" maxlength="20" required value="{{ current_user.username }}">
+            </div>
+            <button type="submit" class="btn btn-blue btn-full">Сменить никнейм</button>
+        </form>
+
+        <h3 style="margin-bottom:12px;font-weight:800">Изменить пароль</h3>
+        <form method="POST" class="auth-form">
+            <input type="hidden" name="action" value="change_password">
+            <div class="form-group">
+                <label>Старый пароль</label>
+                <input type="password" name="old_password" placeholder="Текущий пароль" required>
+            </div>
+            <div class="form-group">
+                <label>Новый пароль</label>
+                <input type="password" name="new_password" placeholder="Минимум 6 символов" minlength="6" required>
+            </div>
+            <div class="form-group">
+                <label>Повтори новый</label>
+                <input type="password" name="new_password2" placeholder="Ещё раз" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Сменить пароль</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

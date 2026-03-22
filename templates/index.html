@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Три Кота — Аэрохоккей{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">
+            <span class="hero-emoji">🏒</span>
+            Аэрохоккей
+            <span class="hero-subtitle">Три Кота</span>
+        </h1>
+        <p class="hero-desc">Сражайся за ранг, собирай скины, поднимайся в рейтинге!</p>
+
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <span class="stat-num" id="hero-online">{{ online_count }}</span>
+                <span class="stat-label">Онлайн</span>
+            </div>
+            <div class="hero-stat">
+                <span class="stat-num">{{ games_count }}</span>
+                <span class="stat-label">Игр сейчас</span>
+            </div>
+        </div>
+
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('lobby') }}" class="btn btn-hero">⚡ Найти матч</a>
+        {% else %}
+            <a href="{{ url_for('register') }}" class="btn btn-hero">🎮 Начать играть</a>
+        {% endif %}
+    </div>
+</div>
+
+<section class="characters-section">
+    <h2 class="section-title">Выбери героя</h2>
+    <div class="characters-grid">
+        {% set chars = [
+            ('kompot', 'Компот', 'Рыжий и отважный! Старший брат.', 'char-kompot'),
+            ('karamelka', 'Карамелька', 'Умная сестрёнка! Тактик.', 'char-karamelka'),
+            ('korzhik', 'Коржик', 'Спортивный и быстрый!', 'char-korzhik')
+        ] %}
+        {% for skin_id, name, desc, css_class in chars %}
+        <div class="character-card">
+            <div class="char-avatar {{ css_class }}">
+                {% set char_img = image_url(skin_id ~ '_ui') %}
+                {% if char_img %}
+                    <img src="{{ char_img }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
+                {% else %}
+                    {% if skin_id == 'kompot' %}🐱{% elif skin_id == 'karamelka' %}🎀{% else %}⚽{% endif %}
+                {% endif %}
+            </div>
+            <h3>{{ name }}</h3>
+            <p>{{ desc }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="leaderboard-section">
+    <h2 class="section-title">🏆 Лидеры</h2>
+    <div class="leaderboard-table">
+        <div class="lb-header">
+            <span>#</span><span>Игрок</span><span>ELO</span><span>Ранг</span><span>WR</span><span>В/П</span>
+        </div>
+        {% for player in top_players %}
+        <div class="lb-row {% if current_user.is_authenticated and player.id == current_user.id %}lb-row-me{% endif %}">
+            <span class="lb-col-rank">
+                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+            </span>
+            <span class="lb-col-name"><a href="{{ url_for('profile', user_id=player.id) }}">{{ player.username }}</a></span>
+            <span class="lb-col-elo" style="color: {{ player.rank_color }}; font-weight: 900;">{{ player.elo }}</span>
+            <span>
+                <span class="rank-badge" style="background: {{ player.rank_color }}20; color: {{ player.rank_color }}; border-color: {{ player.rank_color }}40">
+                    {{ player.rank_title }}
+                </span>
+            </span>
+            <span class="lb-col-wr">{{ player.winrate }}%</span>
+            <span class="lb-col-games">{{ player.wins }}/{{ player.losses }}</span>
+        </div>
+        {% endfor %}
+        {% if not top_players %}
+        <div class="lb-empty">Пока никто не играл 🚀</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="ranks-section">
+    <h2 class="section-title">⭐ Ранги</h2>
+    <div class="ranks-grid">
+        <div class="rank-card" style="--rc: #888888"><span class="rank-icon">🌱</span><span>Новичок</span><span class="rank-elo">&lt;800</span></div>
+        <div class="rank-card" style="--rc: #cc8844"><span class="rank-icon">🥉</span><span>Бронза</span><span class="rank-elo">800+</span></div>
+        <div class="rank-card" style="--rc: #cccccc"><span class="rank-icon">🥈</span><span>Серебро</span><span class="rank-elo">1000+</span></div>
+        <div class="rank-card" style="--rc: #ffdd44"><span class="rank-icon">🥇</span><span>Золото</span><span class="rank-elo">1200+</span></div>
+        <div class="rank-card" style="--rc: #44ffaa"><span class="rank-icon">💎</span><span>Платина</span><span class="rank-elo">1400+</span></div>
+        <div class="rank-card" style="--rc: #44ddff"><span class="rank-icon">💠</span><span>Алмаз</span><span class="rank-elo">1700+</span></div>
+        <div class="rank-card" style="--rc: #aa44ff"><span class="rank-icon">👑</span><span>Мастер</span><span class="rank-elo">2000+</span></div>
+        <div class="rank-card" style="--rc: #ff4444"><span class="rank-icon">🔥</span><span>Легенда</span><span class="rank-elo">2400+</span></div>
+    </div>
+</section>
+{% endblock %}

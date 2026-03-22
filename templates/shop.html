@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Магазин — KotyaraGames{% endblock %}
+
+{% block content %}
+<div class="shop-container">
+    <div class="shop-header">
+        <h1>🛒 Магазин скинов</h1>
+        <div class="shop-balance">
+            <span>🪙 <strong id="shop-coins">{{ current_user.coins }}</strong></span>
+            <span>💎 <strong id="shop-gems">{{ current_user.gems }}</strong></span>
+        </div>
+    </div>
+
+    <div class="shop-grid">
+        {% for item in items %}
+        <div class="shop-item-card rarity-{{ item.rarity }}">
+            <div class="item-rarity-bar" style="background: {{ item.rarity_color }}"></div>
+            <div class="item-preview" style="background: {{ item.primary_color }}15">
+                {% if item.has_image and item.image_url %}
+                    <img src="{{ item.image_url }}" alt="{{ item.name }}" class="item-preview-img">
+                {% else %}
+                    <span class="item-emoji">{{ item.emoji }}</span>
+                {% endif %}
+            </div>
+            <div class="item-info">
+                <h3 class="item-name">{{ item.name }}</h3>
+                <p class="item-desc">{{ item.description }}</p>
+                <span class="item-rarity-label" style="color: {{ item.rarity_color }}">
+                    {% if item.rarity == 'common' %}Обычный
+                    {% elif item.rarity == 'rare' %}Редкий
+                    {% elif item.rarity == 'epic' %}Эпический
+                    {% elif item.rarity == 'legendary' %}Легендарный{% endif %}
+                </span>
+            </div>
+            <div class="item-actions">
+                {% if item.owned %}
+                    {% if item.equipped %}
+                        <button class="btn btn-equipped" disabled>✅ Надето</button>
+                    {% else %}
+                        <button class="btn btn-equip" onclick="equipItem('{{ item.item_id }}')">Надеть</button>
+                    {% endif %}
+                {% elif not item.elo_enough %}
+                    <button class="btn btn-locked" disabled>🔒 ELO {{ item.required_elo }}+</button>
+                {% elif not item.can_afford %}
+                    <div class="item-price">
+                        {% if item.price_coins > 0 %}<span class="price-coins">🪙 {{ item.price_coins }}</span>{% endif %}
+                        {% if item.price_gems > 0 %}<span class="price-gems">💎 {{ item.price_gems }}</span>{% endif %}
+                    </div>
+                    <button class="btn btn-cant-afford" disabled>Не хватает</button>
+                {% else %}
+                    <div class="item-price">
+                        {% if item.price_coins > 0 %}<span class="price-coins">🪙 {{ item.price_coins }}</span>{% endif %}
+                        {% if item.price_gems > 0 %}<span class="price-gems">💎 {{ item.price_gems }}</span>{% endif %}
+                    </div>
+                    <button class="btn btn-buy" onclick="buyItem('{{ item.item_id }}')">Купить</button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shop.js') }}"></script>
+{% endblock %}
