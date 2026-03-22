@@ -1,18 +1,6 @@
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.shop-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            const cat = tab.dataset.category;
-            document.querySelectorAll('.shop-category').forEach(c => c.style.display = 'none');
-            const el = document.getElementById('cat-' + cat);
-            if (el) el.style.display = 'block';
-        });
-    });
-});
-
 async function buyItem(itemId) {
     if (!confirm('Купить этот предмет?')) return;
+
     try {
         const response = await fetch('/api/buy', {
             method: 'POST',
@@ -20,6 +8,7 @@ async function buyItem(itemId) {
             body: JSON.stringify({ item_id: itemId })
         });
         const data = await response.json();
+
         if (data.success) {
             showToast(data.message, 'success');
             document.getElementById('shop-coins').textContent = data.coins;
@@ -41,6 +30,7 @@ async function equipItem(itemId) {
             body: JSON.stringify({ item_id: itemId })
         });
         const data = await response.json();
+
         if (data.success) {
             showToast(data.message, 'success');
             setTimeout(() => location.reload(), 300);
@@ -50,8 +40,4 @@ async function equipItem(itemId) {
     } catch (err) {
         showToast('Ошибка сети', 'error');
     }
-}
-
-function closeModal() {
-    document.getElementById('buyModal').style.display = 'none';
 }

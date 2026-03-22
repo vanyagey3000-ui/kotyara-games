@@ -1,56 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Настройки — KotyaraGames{% endblock %}
+{% block title %}Настройки | Three Cats Faceit{% endblock %}
 
 {% block content %}
 <div class="auth-container">
-    <div class="auth-card" style="max-width:480px">
+    <div class="auth-card" style="max-width: 520px;">
         <div class="auth-header">
-            <span class="auth-icon">⚙️</span>
+            <span class="auth-icon">S</span>
             <h1>Настройки</h1>
+            <p>Управляй аккаунтом и типом соединения.</p>
         </div>
 
-        <!-- Тип подключения -->
-        <h3 style="margin-bottom:12px;font-weight:800">🌐 Тип подключения</h3>
-        <div class="connection-selector" style="margin-bottom:28px">
+        <h3 style="margin-bottom: 12px;">Тип подключения</h3>
+        <div class="connection-selector" style="margin-bottom: 28px;">
             <label class="conn-option" id="opt-p2p">
-                <input type="radio" name="conn_type" value="p2p"
-                    onchange="setConnType('p2p')"
-                    id="radio-p2p">
+                <input type="radio" name="conn_type" value="p2p" onchange="setConnType('p2p')" id="radio-p2p">
                 <div class="conn-card">
-                    <span class="conn-icon">🚀</span>
-                    <div>
-                        <strong>P2P (рекомендуется)</strong>
-                        <p style="font-size:12px;color:var(--dark-soft);margin:2px 0 0">Прямое соединение — минимальный пинг</p>
-                    </div>
+                    <strong>P2P</strong>
+                    <p>Минимальная задержка и самый быстрый отклик.</p>
                 </div>
             </label>
             <label class="conn-option" id="opt-ws">
-                <input type="radio" name="conn_type" value="websocket"
-                    onchange="setConnType('websocket')"
-                    id="radio-ws">
+                <input type="radio" name="conn_type" value="websocket" onchange="setConnType('websocket')" id="radio-ws">
                 <div class="conn-card">
-                    <span class="conn-icon">🌐</span>
-                    <div>
-                        <strong>WebSocket (через сервер)</strong>
-                        <p style="font-size:12px;color:var(--dark-soft);margin:2px 0 0">Стабильно, но зависит от сервера</p>
-                    </div>
+                    <strong>WebSocket</strong>
+                    <p>Стабильный резервный режим через сервер.</p>
                 </div>
             </label>
         </div>
 
-        <!-- Смена ника -->
-        <h3 style="margin-bottom:12px;font-weight:800">✏️ Изменить никнейм</h3>
-        <form method="POST" class="auth-form" style="margin-bottom:28px">
+        <h3 style="margin-bottom: 12px;">Сменить ник</h3>
+        <form method="POST" class="auth-form" style="margin-bottom: 28px;">
             <input type="hidden" name="action" value="change_username">
             <div class="form-group">
-                <label>Новый никнейм</label>
+                <label>Новый ник</label>
                 <input type="text" name="new_username" placeholder="3-20 символов" minlength="3" maxlength="20" required value="{{ current_user.username }}">
             </div>
-            <button type="submit" class="btn btn-blue btn-full">Сменить никнейм</button>
+            <button type="submit" class="btn btn-primary btn-full">Обновить ник</button>
         </form>
 
-        <!-- Смена пароля -->
-        <h3 style="margin-bottom:12px;font-weight:800">🔒 Изменить пароль</h3>
+        <h3 style="margin-bottom: 12px;">Сменить пароль</h3>
         <form method="POST" class="auth-form">
             <input type="hidden" name="action" value="change_password">
             <div class="form-group">
@@ -62,10 +50,10 @@
                 <input type="password" name="new_password" placeholder="Минимум 6 символов" minlength="6" required>
             </div>
             <div class="form-group">
-                <label>Повтори новый</label>
-                <input type="password" name="new_password2" placeholder="Ещё раз" required>
+                <label>Повтор пароля</label>
+                <input type="password" name="new_password2" placeholder="Повтори новый пароль" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-full">Сменить пароль</button>
+            <button type="submit" class="btn btn-secondary btn-full">Сменить пароль</button>
         </form>
     </div>
 </div>

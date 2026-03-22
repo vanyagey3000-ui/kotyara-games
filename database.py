@@ -6,6 +6,19 @@ import math
 
 db = SQLAlchemy()
 
+FACEIT_LEVELS = [
+    {'level': 1, 'min_elo': 100, 'max_elo': 500, 'color': '#9ca3af'},
+    {'level': 2, 'min_elo': 501, 'max_elo': 750, 'color': '#c08457'},
+    {'level': 3, 'min_elo': 751, 'max_elo': 900, 'color': '#cbd5e1'},
+    {'level': 4, 'min_elo': 901, 'max_elo': 1050, 'color': '#f59e0b'},
+    {'level': 5, 'min_elo': 1051, 'max_elo': 1200, 'color': '#22c55e'},
+    {'level': 6, 'min_elo': 1201, 'max_elo': 1350, 'color': '#06b6d4'},
+    {'level': 7, 'min_elo': 1351, 'max_elo': 1530, 'color': '#3b82f6'},
+    {'level': 8, 'min_elo': 1531, 'max_elo': 1750, 'color': '#8b5cf6'},
+    {'level': 9, 'min_elo': 1751, 'max_elo': 2000, 'color': '#f97316'},
+    {'level': 10, 'min_elo': 2001, 'max_elo': 2300, 'color': '#f43f5e'},
+]
+
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -79,11 +92,63 @@ class User(UserMixin, db.Model):
     def has_item(self, item_id):
         return UserItem.query.filter_by(user_id=self.id, item_id=item_id).first() is not None
 
+    @property
+    def unread_messages_count(self):
+        return DirectMessage.query.filter_by(recipient_id=self.id, is_read=False).count()
+
+    @property
+    def pending_friend_requests_count(self):
+        return FriendRequest.query.filter_by(recipient_id=self.id, status='pending').count()
+
+    @property
+    def faceit_level_info(self):
+        for idx, level in enumerate(FACEIT_LEVELS):
+            if self.elo <= level['max_elo'] or idx == len(FACEIT_LEVELS) - 1:
+                progress_min = level['min_elo']
+                progress_max = level['max_elo']
+                progress_value = min(max(self.elo, progress_min), progress_max) - progress_min
+                progress_span = max(progress_max - progress_min, 1)
+                progress_percent = round((progress_value / progress_span) * 100, 1)
+                next_level = FACEIT_LEVELS[idx + 1]['level'] if idx + 1 < len(FACEIT_LEVELS) else None
+                next_level_elo = FACEIT_LEVELS[idx + 1]['min_elo'] if idx + 1 < len(FACEIT_LEVELS) else None
+                return {
+                    'level': level['level'],
+                    'color': level['color'],
+                    'current_elo': self.elo,
+                    'min_elo': progress_min,
+                    'max_elo': progress_max,
+                    'progress_value': progress_value,
+                    'progress_span': progress_span,
+                    'progress_percent': 100 if level['level'] == 10 and self.elo >= progress_max else progress_percent,
+                    'next_level': next_level,
+                    'next_level_elo': next_level_elo,
+                }
+
+        last_level = FACEIT_LEVELS[-1]
+        return {
+            'level': last_level['level'],
+            'color': last_level['color'],
+            'current_elo': self.elo,
+            'min_elo': last_level['min_elo'],
+            'max_elo': last_level['max_elo'],
+            'progress_value': last_level['max_elo'] - last_level['min_elo'],
+            'progress_span': last_level['max_elo'] - last_level['min_elo'],
+            'progress_percent': 100,
+            'next_level': None,
+            'next_level_elo': None,
+        }
+
+    @property
+    def faceit_level(self):
+        return self.faceit_level_info['level']
+
     def to_dict(self):
         return {
             'id': self.id, 'username': self.username,
             'elo': self.elo, 'rank': self.rank_title,
             'rank_color': self.rank_color,
+            'faceit_level': self.faceit_level,
+            'faceit_level_info': self.faceit_level_info,
             'wins': self.wins, 'losses': self.losses,
             'total_games': self.total_games, 'winrate': self.winrate,
             'coins': self.coins, 'gems': self.gems,
@@ -168,6 +233,86 @@ class ChatMessage(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = db.relationship('User', backref='messages', lazy=True)
+
+
+class FriendRequest(db.Model):
+    __tablename__ = 'friend_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    responded_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint('sender_id', 'recipient_id', name='uniq_friend_request'),)
+
+
+class Friendship(db.Model):
+    __tablename__ = 'friendships'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    friend_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'friend_id', name='uniq_friendship'),)
+
+
+class Party(db.Model):
+    __tablename__ = 'parties'
+
+    id = db.Column(db.Integer, primary_key=True)
+    leader_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='active')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class PartyMember(db.Model):
+    __tablename__ = 'party_members'
+
+    id = db.Column(db.Integer, primary_key=True)
+    party_id = db.Column(db.Integer, db.ForeignKey('parties.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (db.UniqueConstraint('party_id', 'user_id', name='uniq_party_member'),)
+
+
+class PartyInvite(db.Model):
+    __tablename__ = 'party_invites'
+
+    id = db.Column(db.Integer, primary_key=True)
+    party_id = db.Column(db.Integer, db.ForeignKey('parties.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    responded_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint('party_id', 'recipient_id', name='uniq_party_invite'),)
+
+
+class DirectMessage(db.Model):
+    __tablename__ = 'direct_messages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    message = db.Column(db.String(1000), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class TeamFinderPost(db.Model):
+    __tablename__ = 'team_finder_posts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    mode = db.Column(db.String(10), default='1v1')
+    note = db.Column(db.String(300), nullable=False)
+    status = db.Column(db.String(20), default='active')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 def calculate_elo(winner_elo, loser_elo, k=32, draw=False):

@@ -1,86 +1,132 @@
 {% extends "base.html" %}
-{% block title %}Лобби — KotyaraGames{% endblock %}
+{% block title %}Лобби | KotayraGames{% endblock %}
 
 {% block content %}
-<div class="lobby-container">
-    <div class="lobby-header">
-        <h1>⚡ Найти матч</h1>
-        <p>Выбери режим и сразись!</p>
-    </div>
-
-    <div class="player-card-lobby">
-        <div class="pcl-avatar">
-            {% set av = image_url(current_user.active_skin ~ '_ui') %}
-            {% if av %}
-                <img src="{{ av }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
-            {% else %}
-                🐱
-            {% endif %}
-        </div>
-        <div class="pcl-info">
-            <h2>{{ current_user.username }}</h2>
-            <div class="pcl-rank" style="color: {{ current_user.rank_color }}">
-                {{ current_user.rank_title }} — {{ current_user.elo }} ELO
+{% set faceit = current_user.faceit_level_info %}
+<section class="hub-layout hub-layout-lobby">
+    <aside class="hub-sidebar">
+        <div class="hub-profile-card">
+            <div class="hub-profile-avatar">
+                {% set hub_avatar = image_url(current_user.active_skin ~ '_ui') %}
+                {% if hub_avatar %}
+                    <img src="{{ hub_avatar }}" alt="{{ current_user.username }}">
+                {% else %}
+                    <span>{{ current_user.username[0] }}</span>
+                {% endif %}
             </div>
-            <div class="pcl-stats-mini">
-                {{ current_user.wins }}W / {{ current_user.losses }}L · {{ current_user.winrate }}% WR
+            <div class="hub-profile-meta">
+                <strong>{{ current_user.username }}</strong>
+                <span>FACEIT LVL {{ current_user.faceit_level }}</span>
             </div>
         </div>
-    </div>
 
-    <!-- Выбор режима -->
-    <div class="mode-selector" id="mode-selector">
-        <h3 style="text-align:center;margin-bottom:14px;font-weight:800">Режим игры</h3>
-        <div class="mode-buttons">
-            <button class="mode-btn mode-active" data-mode="1v1" onclick="selectMode('1v1', this)">
-                <span class="mode-icon">⚔️</span>
-                <span class="mode-name">1 × 1</span>
-                <span class="mode-desc">Классика</span>
-            </button>
-            <button class="mode-btn" data-mode="2v2" onclick="selectMode('2v2', this)">
-                <span class="mode-icon">👥</span>
-                <span class="mode-name">2 × 2</span>
-                <span class="mode-desc">Командный</span>
-            </button>
-            <button class="mode-btn" data-mode="5v5" onclick="selectMode('5v5', this)">
-                <span class="mode-icon">🏟️</span>
-                <span class="mode-name">5 × 5</span>
-                <span class="mode-desc">Хаос!</span>
-            </button>
+        <nav class="hub-menu">
+            <a href="{{ url_for('index') }}" class="hub-menu-item">Главная</a>
+            <a href="{{ url_for('shop') }}" class="hub-menu-item">Инвентарь</a>
+            <a href="{{ url_for('profile') }}" class="hub-menu-item">Персонаж</a>
+            <a href="{{ url_for('chat_page') }}" class="hub-menu-item">Друзья</a>
+            <a href="{{ url_for('profile') }}" class="hub-menu-item active">Рейтинг</a>
+            <a href="{{ url_for('shop') }}" class="hub-menu-item">Магазин</a>
+        </nav>
+    </aside>
+
+    <div class="hub-stage">
+        <div class="hub-statusbar">
+            <span class="hub-online-pill"><span class="hub-online-dot"></span>в лобби</span>
+            <span class="hub-brand-tag">KotayraGames</span>
+        </div>
+
+        <div class="hub-elo-card">
+            <div class="hub-elo-badge">{{ current_user.faceit_level }}</div>
+            <div class="hub-elo-info">
+                <strong>{{ current_user.elo }} ELO</strong>
+                <div class="hub-elo-bar">
+                    <div class="hub-elo-fill" style="width: {{ faceit.progress_percent }}%; --level-color: {{ faceit.color }};"></div>
+                </div>
+                <span>
+                    {% if faceit.next_level %}
+                        До LVL {{ faceit.next_level }} осталось {{ faceit.next_level_elo - faceit.current_elo }} ELO
+                    {% else %}
+                        Максимальный уровень
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="hub-character">
+            {% set stage_skin = image_url(current_user.active_skin ~ '_ui') %}
+            <div class="hub-character-card">
+                {% if stage_skin %}
+                    <img src="{{ stage_skin }}" alt="character" class="hub-character-image">
+                {% else %}
+                    <div class="hub-character-fallback">{{ current_user.username[0] }}</div>
+                {% endif %}
+            </div>
+            <div class="hub-level-float">{{ current_user.faceit_level }}</div>
+        </div>
+
+        <div class="hub-streak-card">
+            <span>Серия побед</span>
+            <strong>{{ current_user.win_streak }}</strong>
         </div>
     </div>
 
-    <div class="search-section" id="search-section">
-        <button class="btn-search" id="btn-find-match" onclick="findMatch()">
-            🎯 Найти соперника
-        </button>
+    <aside class="hub-actions">
+        <div class="hub-top-controls">
+            <span class="hub-wallet">C {{ current_user.coins }}</span>
+            <a href="{{ url_for('settings') }}" class="hub-settings-btn">Настройки</a>
+        </div>
 
-        <div class="search-status" id="search-status" style="display: none">
+        <div class="hub-action-stack">
+            <button class="hub-stack-btn hub-stack-btn-primary" id="btn-find-match" onclick="findMatch()">Играть</button>
+            <a href="{{ url_for('shop') }}" class="hub-stack-btn">Инвентарь</a>
+            <a href="{{ url_for('profile') }}" class="hub-stack-btn">Персонаж</a>
+            <a href="{{ url_for('chat_page') }}" class="hub-stack-btn">Друзья</a>
+        </div>
+
+        <div class="hub-mode-panel" id="mode-selector">
+            <button class="hub-select-card active" data-mode="1v1" onclick="selectMode('1v1', this)">Режим: 1x1 рейтинговый</button>
+            <button class="hub-select-card" data-mode="2v2" onclick="selectMode('2v2', this)">Режим: 2x2 рейтинговый</button>
+            <button class="hub-select-card" data-mode="5v5" onclick="selectMode('5v5', this)">Режим: 5x5 рейтинговый</button>
+        </div>
+
+        <div class="search-status hub-search-card" id="search-status" style="display: none">
             <div class="search-spinner"><div class="spinner"></div></div>
             <div class="search-info">
-                <span class="search-label">Поиск <span id="search-mode-label">1v1</span>...</span>
-                <span class="search-timer" id="search-timer">0:00</span>
+                <span class="search-label">Поиск <span id="search-mode-label">1v1</span></span>
+                <span class="search-meta">Очередь: <strong id="queue-size">1</strong> · Таймер: <strong id="search-timer">0:00</strong></span>
             </div>
             <button class="btn-cancel" onclick="cancelSearch()">Отмена</button>
         </div>
-    </div>
 
-    <div class="match-found-overlay" id="match-found" style="display: none">
-        <div class="match-found-card">
-            <h2>⚔️ Матч найден!</h2>
-            <div class="mf-players">
-                <div class="mf-player">
-                    <span class="mf-name">{{ current_user.username }}</span>
-                    <span class="mf-elo" style="color: {{ current_user.rank_color }}">{{ current_user.elo }}</span>
-                </div>
-                <span class="mf-vs">VS</span>
-                <div class="mf-player">
-                    <span class="mf-name" id="opponent-name">???</span>
-                    <span class="mf-elo" id="opponent-elo">???</span>
-                </div>
+        <div class="hub-rating-card">
+            <div class="hub-rating-header">
+                <strong>История матчей</strong>
+                <span>live</span>
             </div>
-            <p class="mf-loading">Загрузка...</p>
+            <div class="hub-rating-row"><span>W</span><span>Побед</span><span>{{ current_user.wins }}</span></div>
+            <div class="hub-rating-row"><span>L</span><span>Поражений</span><span>{{ current_user.losses }}</span></div>
+            <div class="hub-rating-row"><span>%</span><span>Winrate</span><span>{{ current_user.winrate }}</span></div>
         </div>
+    </aside>
+</section>
+
+<div class="match-found-overlay" id="match-found" style="display: none">
+    <div class="match-found-card">
+        <span class="section-kicker">MATCH FOUND</span>
+        <h2>Соперник найден</h2>
+        <div class="mf-players">
+            <div class="mf-player">
+                <span class="mf-name">{{ current_user.username }}</span>
+                <span class="mf-elo">ELO {{ current_user.elo }}</span>
+            </div>
+            <span class="mf-vs">VS</span>
+            <div class="mf-player">
+                <span class="mf-name" id="opponent-name">...</span>
+                <span class="mf-elo" id="opponent-elo">...</span>
+            </div>
+        </div>
+        <p class="mf-loading">Подключаем арену...</p>
     </div>
 </div>
 {% endblock %}
@@ -94,17 +140,17 @@ var searchInterval = null;
 
 function selectMode(mode, btn) {
     selectedMode = mode;
-    document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('mode-active'); });
-    btn.classList.add('mode-active');
+    document.querySelectorAll('.hub-select-card').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
 }
 
 function findMatch() {
     if (isSearching) return;
     isSearching = true;
-    document.getElementById('btn-find-match').style.display = 'none';
-    document.getElementById('mode-selector').style.display = 'none';
     document.getElementById('search-status').style.display = 'flex';
+    document.getElementById('mode-selector').style.opacity = '0.55';
     document.getElementById('search-mode-label').textContent = selectedMode;
+    document.getElementById('queue-size').textContent = '1';
     searchStart = Date.now();
     searchInterval = setInterval(function() {
         var el = Math.floor((Date.now() - searchStart) / 1000);
@@ -118,21 +164,27 @@ function findMatch() {
 function cancelSearch() {
     isSearching = false;
     clearInterval(searchInterval);
-    document.getElementById('btn-find-match').style.display = '';
-    document.getElementById('mode-selector').style.display = '';
+    document.getElementById('mode-selector').style.opacity = '1';
     document.getElementById('search-status').style.display = 'none';
     window.socket.emit('cancel_search');
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     if (!window.socket) return;
+
+    window.socket.on('queue_status', function(data) {
+        if (data.queue_size) {
+            document.getElementById('queue-size').textContent = data.queue_size;
+        }
+    });
+
     window.socket.on('match_found', function(data) {
         clearInterval(searchInterval);
         isSearching = false;
         document.getElementById('match-found').style.display = 'flex';
         document.getElementById('opponent-name').textContent = data.opponent;
-        document.getElementById('opponent-elo').textContent = data.opponent_elo + ' ELO';
-        setTimeout(function() { window.location.href = '/game/' + data.room_id; }, 2000);
+        document.getElementById('opponent-elo').textContent = 'ELO ' + data.opponent_elo;
+        setTimeout(function() { window.location.href = '/game/' + data.room_id; }, 1800);
     });
 });
 </script>

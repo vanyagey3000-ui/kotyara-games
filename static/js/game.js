@@ -15,6 +15,7 @@ var mouseX = 400, mouseY = 250;
 var lastSend = 0;
 
 var puck = {x: FW/2, y: FH/2, vx: 0, vy: 0};
+var serverPuck = {x: FW/2, y: FH/2, vx: 0, vy: 0, receivedAt: 0, packetGap: 16};
 var enemyPad = {x: FW-80, y: FH/2};
 var drawPuck = {x: FW/2, y: FH/2};
 var drawEnemy = {x: FW-80, y: FH/2};
@@ -26,6 +27,8 @@ var TRAIL_MAX = 16;
 
 var p2pActive = false;
 var isHost = false;
+var lastFrameAt = performance.now();
+var lastPuckPacketAt = 0;
 
 var imgs = {};
 var bgImg = null;
@@ -117,6 +120,14 @@ function initGame() {
 
         // Шайба — ВСЕГДА от сервера
         if (state.puck) {
+            var packetNow = performance.now();
+            serverPuck.packetGap = lastPuckPacketAt ? (packetNow - lastPuckPacketAt) : 16;
+            lastPuckPacketAt = packetNow;
+            serverPuck.x = state.puck.x;
+            serverPuck.y = state.puck.y;
+            serverPuck.vx = state.puck.vx || 0;
+            serverPuck.vy = state.puck.vy || 0;
+            serverPuck.receivedAt = packetNow;
             puck.x = state.puck.x;
             puck.y = state.puck.y;
             puck.vx = state.puck.vx || 0;
@@ -188,6 +199,12 @@ function syncFull(state) {
         enemyPad.y = drawEnemy.y = state.paddles[en].y;
     }
     if (state.puck) {
+        serverPuck.x = state.puck.x;
+        serverPuck.y = state.puck.y;
+        serverPuck.vx = state.puck.vx || 0;
+        serverPuck.vy = state.puck.vy || 0;
+        serverPuck.receivedAt = performance.now();
+        serverPuck.packetGap = 16;
         puck.x = drawPuck.x = state.puck.x;
         puck.y = drawPuck.y = state.puck.y;
         puck.vx = state.puck.vx || 0;
@@ -271,6 +288,9 @@ function gameLoop() {
 }
 
 function update() {
+    var frameNow = performance.now();
+    var dt = Math.min((frameNow - lastFrameAt) / 1000, 0.05);
+    lastFrameAt = frameNow;
     if (!gs) return;
     var playing = (gs.state === 'playing');
 
@@ -302,8 +322,23 @@ function update() {
     }
 
     // Интерполяция для плавного рендера
-    drawPuck.x = lerp(drawPuck.x, puck.x, 0.5);
-    drawPuck.y = lerp(drawPuck.y, puck.y, 0.5);
+    var packetAge = Math.min((frameNow - serverPuck.receivedAt) / 1000, 0.18);
+    var packetFrames = Math.min((serverPuck.packetGap || 16) / 16.6667, 4);
+    var predictFactor = 1.4 + packetFrames * 0.35;
+    var puckTargetX = serverPuck.x + serverPuck.vx * packetAge * 60 * predictFactor;
+    var puckTargetY = serverPuck.y + serverPuck.vy * packetAge * 60 * predictFactor;
+    var puckGap = Math.sqrt(Math.pow(puckTargetX - drawPuck.x, 2) + Math.pow(puckTargetY - drawPuck.y, 2));
+    if (!playing || gs.state === 'countdown') {
+        drawPuck.x = lerp(drawPuck.x, puck.x, 0.45);
+        drawPuck.y = lerp(drawPuck.y, puck.y, 0.45);
+    } else {
+        drawPuck.x = lerp(drawPuck.x, puckTargetX, puckGap > 90 ? 0.35 : 0.22);
+        drawPuck.y = lerp(drawPuck.y, puckTargetY, puckGap > 90 ? 0.35 : 0.22);
+        if (packetAge > 0.1) {
+            drawPuck.x += serverPuck.vx * dt * 60 * 0.28;
+            drawPuck.y += serverPuck.vy * dt * 60 * 0.28;
+        }
+    }
     drawEnemy.x = lerp(drawEnemy.x, enemyPad.x, p2pActive ? 0.7 : 0.4);
     drawEnemy.y = lerp(drawEnemy.y, enemyPad.y, p2pActive ? 0.7 : 0.4);
 

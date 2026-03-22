@@ -1,22 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Регистрация — Три Кота{% endblock %}
+{% block title %}Регистрация | Three Cats Faceit{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-card">
         <div class="auth-header">
-            <span class="auth-icon">🐱</span>
+            <span class="auth-icon">N</span>
             <h1>Регистрация</h1>
-            <p>Присоединяйся к Трём Котам!</p>
+            <p>Создай аккаунт и начни путь от первых ELO до высокого FACEIT уровня.</p>
         </div>
 
         <form method="POST" class="auth-form" id="register-form">
             <div class="form-group">
-                <label for="username">Имя игрока</label>
-                <input type="text" id="username" name="username" placeholder="Твой никнейм"
+                <label for="username">Ник</label>
+                <input type="text" id="username" name="username" placeholder="Твой ник"
                        minlength="3" maxlength="20" required
                        value="{{ request.form.get('username', '') }}">
-                <span class="form-hint">3-20 символов</span>
+                <span class="form-hint">От 3 до 20 символов</span>
             </div>
 
             <div class="form-group">
@@ -33,12 +33,10 @@
 
             <div class="form-group">
                 <label for="password2">Повтори пароль</label>
-                <input type="password" id="password2" name="password2" placeholder="Ещё раз" required>
+                <input type="password" id="password2" name="password2" placeholder="Еще раз" required>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-full">
-                🎮 Создать аккаунт
-            </button>
+            <button type="submit" class="btn btn-primary btn-full">Создать аккаунт</button>
         </form>
 
         <div class="auth-footer">
@@ -46,7 +44,7 @@
         </div>
 
         <div class="auth-bonus">
-            <span>🎁</span> Бонус за регистрацию: <strong>500 монет</strong> + <strong>3 бесплатных скина!</strong>
+            На старте ты получаешь 500 coins и 3 базовых скина.
         </div>
     </div>
 </div>

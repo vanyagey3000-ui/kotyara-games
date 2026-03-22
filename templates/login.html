@@ -1,29 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Вход — Три Кота{% endblock %}
+{% block title %}Вход | Three Cats Faceit{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-card">
         <div class="auth-header">
-            <span class="auth-icon">🏒</span>
+            <span class="auth-icon">F</span>
             <h1>Вход</h1>
-            <p>С возвращением!</p>
+            <p>Вернись в матчмейкинг и продолжай поднимать уровень.</p>
         </div>
 
         <form method="POST" class="auth-form">
             <div class="form-group">
-                <label for="username">Имя игрока</label>
-                <input type="text" id="username" name="username" placeholder="Никнейм" required autofocus>
+                <label for="username">Ник</label>
+                <input type="text" id="username" name="username" placeholder="Введите ник" required autofocus>
             </div>
 
             <div class="form-group">
                 <label for="password">Пароль</label>
-                <input type="password" id="password" name="password" placeholder="Пароль" required>
+                <input type="password" id="password" name="password" placeholder="Введите пароль" required>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-full">
-                ⚡ Войти
-            </button>
+            <button type="submit" class="btn btn-primary btn-full">Войти</button>
         </form>
 
         <div class="auth-footer">

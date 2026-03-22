@@ -1,83 +1,95 @@
 {% extends "base.html" %}
-{% block title %}{{ user.username }} — Профиль{% endblock %}
+{% block title %}{{ user.username }} | KotayraGames{% endblock %}
 
 {% block content %}
-<div class="profile-container">
-    <div class="profile-header">
-        <div class="profile-avatar" style="background: {{ user.rank_color }}22; border-color: {{ user.rank_color }}">
+{% set faceit = user.faceit_level_info %}
+<section class="profile-shell">
+    <div class="profile-hero-card">
+        <div class="profile-hero-visual">
             {% set avatar_img = image_url(user.active_skin ~ '_ui') %}
-            {% if avatar_img %}
-                <img src="{{ avatar_img }}" alt="{{ user.active_skin }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
-            {% else %}
-                {% if user.active_skin == 'kompot' %}🐱
-                {% elif user.active_skin == 'karamelka' %}🎀
-                {% elif user.active_skin == 'korzhik' %}⚽
-                {% else %}🐱{% endif %}
+            <div class="profile-hero-avatar">
+                {% if avatar_img %}
+                    <img src="{{ avatar_img }}" alt="{{ user.username }}">
+                {% else %}
+                    <span>{{ user.username[0] }}</span>
+                {% endif %}
+            </div>
+            <div class="profile-hero-level">{{ faceit.level }}</div>
+        </div>
+
+        <div class="profile-hero-main">
+            <span class="section-kicker">PROFILE</span>
+            <div class="profile-title-row">
+                <h1 class="profile-name">{{ user.username }}</h1>
+                <span class="rank-badge-lg">{{ user.rank_title }}</span>
+            </div>
+            <div class="profile-elo-line">
+                <span class="profile-elo">ELO {{ user.elo }}</span>
+                <span class="faceit-mini-level">FACEIT LVL {{ faceit.level }}</span>
+            </div>
+            <p class="profile-member">Игрок в KotayraGames с {{ user.created_at.strftime('%d.%m.%Y') }}</p>
+
+            <div class="faceit-progress-card">
+                <div class="faceit-progress-head">
+                    <span>Прогресс уровня</span>
+                    <span>{{ faceit.current_elo }} ELO</span>
+                </div>
+                <div class="faceit-progress-bar">
+                    <div class="faceit-progress-fill" style="width: {{ faceit.progress_percent }}%; --level-color: {{ faceit.color }};"></div>
+                    <div class="faceit-progress-level">LVL {{ faceit.level }}</div>
+                </div>
+                <div class="faceit-progress-foot">
+                    <span>{{ faceit.min_elo }} ELO</span>
+                    {% if faceit.next_level %}
+                        <span>До LVL {{ faceit.next_level }}: {{ faceit.next_level_elo - faceit.current_elo }} ELO</span>
+                    {% else %}
+                        <span>Максимальный уровень</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if user.id == current_user.id %}
+            <div class="profile-quick-links">
+                <a href="{{ url_for('social_page') }}" class="hub-stack-btn">Друзья и пати</a>
+                <a href="{{ url_for('messages_page') }}" class="hub-stack-btn">Личные сообщения</a>
+            </div>
             {% endif %}
         </div>
-        <div class="profile-info">
-            <h1 class="profile-name">{{ user.username }}</h1>
-            <div class="profile-rank">
-                <span class="rank-badge-lg" style="background: {{ user.rank_color }}20; color: {{ user.rank_color }}; border-color: {{ user.rank_color }}">
-                    {{ user.rank_title }}
-                </span>
-                <span class="profile-elo" style="color: {{ user.rank_color }}">{{ user.elo }} ELO</span>
-            </div>
-            <p class="profile-member">С {{ user.created_at.strftime('%d.%m.%Y') }}</p>
-        </div>
-        <div class="profile-currency">
+
+        <div class="profile-side-cards">
             <div class="currency-item">
-                <span class="currency-icon">🪙</span>
+                <span class="currency-label">Coins</span>
                 <span class="currency-amount">{{ user.coins }}</span>
-                <span class="currency-label">Монеты</span>
             </div>
             <div class="currency-item">
-                <span class="currency-icon">💎</span>
+                <span class="currency-label">Gems</span>
                 <span class="currency-amount">{{ user.gems }}</span>
-                <span class="currency-label">Гемы</span>
+            </div>
+            <div class="currency-item">
+                <span class="currency-label">Peak ELO</span>
+                <span class="currency-amount">{{ user.peak_elo }}</span>
             </div>
         </div>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">{{ user.total_games }}</div><div class="stat-name">Игр</div></div>
+    <section class="stats-grid">
+        <div class="stat-card"><div class="stat-value">{{ user.total_games }}</div><div class="stat-name">Матчей</div></div>
         <div class="stat-card stat-win"><div class="stat-value">{{ user.wins }}</div><div class="stat-name">Побед</div></div>
         <div class="stat-card stat-loss"><div class="stat-value">{{ user.losses }}</div><div class="stat-name">Поражений</div></div>
-        <div class="stat-card"><div class="stat-value">{{ user.winrate }}%</div><div class="stat-name">Винрейт</div></div>
-        <div class="stat-card"><div class="stat-value">{{ user.peak_elo }}</div><div class="stat-name">Пик ELO</div></div>
-        <div class="stat-card"><div class="stat-value">{{ user.best_streak }}</div><div class="stat-name">Лучшая серия</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.winrate }}%</div><div class="stat-name">Winrate</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.best_streak }}</div><div class="stat-name">Best streak</div></div>
         <div class="stat-card"><div class="stat-value">{{ user.goals_scored }}</div><div class="stat-name">Голов</div></div>
-        <div class="stat-card"><div class="stat-value">{{ user.kd_ratio }}</div><div class="stat-name">K/D голов</div></div>
-    </div>
+        <div class="stat-card"><div class="stat-value">{{ user.goals_conceded }}</div><div class="stat-name">Пропущено</div></div>
+        <div class="stat-card"><div class="stat-value">{{ user.kd_ratio }}</div><div class="stat-name">K/D</div></div>
+    </section>
 
-    <div class="elo-progress-section">
-        <h2>Прогресс ранга</h2>
-        {% set ranks = [
-            ('Новичок', 0, 800, '#888888'),
-            ('Бронза', 800, 1000, '#cc8844'),
-            ('Серебро', 1000, 1200, '#cccccc'),
-            ('Золото', 1200, 1400, '#ffdd44'),
-            ('Платина', 1400, 1700, '#44ffaa'),
-            ('Алмаз', 1700, 2000, '#44ddff'),
-            ('Мастер', 2000, 2400, '#aa44ff'),
-            ('Легенда', 2400, 3000, '#ff4444')
-        ] %}
-        {% for name, min_elo, max_elo, color in ranks %}
-            {% if user.elo >= min_elo and user.elo < max_elo %}
-                {% set progress = ((user.elo - min_elo) / (max_elo - min_elo)) * 100 %}
-                <div class="elo-bar-label">
-                    <span>{{ name }} ({{ min_elo }})</span>
-                    <span>{{ user.elo }} / {{ max_elo }}</span>
-                </div>
-                <div class="elo-bar">
-                    <div class="elo-bar-fill" style="width: {{ progress }}%; background: {{ color }}"></div>
-                </div>
-            {% endif %}
-        {% endfor %}
-    </div>
-
-    <div class="matches-section">
-        <h2>📜 Последние матчи</h2>
+    <section class="matches-section">
+        <div class="section-head">
+            <div>
+                <span class="section-kicker">MATCH HISTORY</span>
+                <h2 class="section-title">Последние матчи</h2>
+            </div>
+        </div>
         {% if matches %}
         <div class="matches-list">
             {% for m in matches %}
@@ -91,20 +103,20 @@
                 </div>
                 <div class="match-elo">
                     <span class="{{ 'elo-up' if m.elo_change > 0 else 'elo-down' }}">
-                        {{ '+' if m.elo_change > 0 else '' }}{{ m.elo_change }}
+                        {{ '+' if m.elo_change > 0 else '' }}{{ m.elo_change }} ELO
                     </span>
                 </div>
-                <div class="match-coins">🪙 +{{ m.coins }}</div>
+                <div class="match-coins">+{{ m.coins }} coins</div>
                 <div class="match-date">{{ m.date.strftime('%d.%m %H:%M') if m.date else '' }}</div>
             </div>
             {% endfor %}
         </div>
         {% else %}
         <div class="empty-state">
-            <p>Нет матчей. Время играть! 🚀</p>
+            <p>Матчей пока нет. Поднимай уровень и набивай историю матчей.</p>
             <a href="{{ url_for('lobby') }}" class="btn btn-primary">Найти матч</a>
         </div>
         {% endif %}
-    </div>
-</div>
+    </section>
+</section>
 {% endblock %}

@@ -15,6 +15,9 @@ class GameRoom:
     PUCK_SPEED_LIMIT = 18
     PADDLE_SPEED_LIMIT = 12
     BOUNCE_ENERGY = 0.85
+    FACEOFF_SPEED = 6.2
+    MIN_PUCK_SPEED = 2.1
+    STALL_PUSH = 3.8
 
     def __init__(self, room_id=None):
         self.room_id = room_id or str(uuid.uuid4())[:8]
@@ -26,6 +29,8 @@ class GameRoom:
         self.start_time = None
         self.last_update = time.time()
         self.game_mode = '1v1'
+        self.serve_direction = random.choice([-1, 1])
+        self.slow_puck_since = None
         self.goal_y_start = (self.HEIGHT - self.GOAL_WIDTH) / 2
         self.goal_y_end = (self.HEIGHT + self.GOAL_WIDTH) / 2
         self.reset_positions()
@@ -94,9 +99,9 @@ class GameRoom:
                 self.state = 'playing'
                 self.start_time = now
                 angle = random.uniform(-0.5, 0.5)
-                d = random.choice([-1, 1])
-                self.puck['vx'] = 5 * d * math.cos(angle)
-                self.puck['vy'] = 5 * math.sin(angle)
+                d = self.serve_direction or random.choice([-1, 1])
+                self.puck['vx'] = self.FACEOFF_SPEED * d * math.cos(angle)
+                self.puck['vy'] = self.FACEOFF_SPEED * math.sin(angle)
             return self.get_state()
 
         if self.state != 'playing':
@@ -137,6 +142,22 @@ class GameRoom:
                 ratio = self.PUCK_SPEED_LIMIT / speed
                 puck['vx'] *= ratio
                 puck['vy'] *= ratio
+            elif speed < self.MIN_PUCK_SPEED:
+                if self.slow_puck_since is None:
+                    self.slow_puck_since = now
+                elif now - self.slow_puck_since > 0.65:
+                    push = self.STALL_PUSH
+                    if speed > 0:
+                        puck['vx'] = (puck['vx'] / speed) * push
+                        puck['vy'] = (puck['vy'] / speed) * push
+                    else:
+                        angle = random.uniform(-0.75, 0.75)
+                        d = self.serve_direction or random.choice([-1, 1])
+                        puck['vx'] = push * d * math.cos(angle)
+                        puck['vy'] = push * math.sin(angle)
+                    self.slow_puck_since = None
+            else:
+                self.slow_puck_since = None
 
             pr = puck['radius']
             if puck['y'] - pr <= 0:
@@ -149,6 +170,8 @@ class GameRoom:
             goal = self._check_goal()
             if goal:
                 self.score[goal - 1] += 1
+                self.serve_direction = -1 if goal == 1 else 1
+                self.slow_puck_since = None
                 if self.score[0] >= self.MAX_SCORE or self.score[1] >= self.MAX_SCORE:
                     self.state = 'finished'
                 else:
@@ -204,8 +227,8 @@ class GameRoom:
                 rest = 1.2
                 puck['vx'] -= (1 + rest) * dot * nx
                 puck['vy'] -= (1 + rest) * dot * ny
-                puck['vx'] += pad['vx'] * 0.016 * 0.5
-                puck['vy'] += pad['vy'] * 0.016 * 0.5
+                puck['vx'] += pad['vx'] * 0.016 * 0.75
+                puck['vy'] += pad['vy'] * 0.016 * 0.75
 
     def get_state(self):
         players_info = {}

@@ -1,99 +1,107 @@
 {% extends "base.html" %}
-{% block title %}Три Кота — Аэрохоккей{% endblock %}
+{% block title %}KotayraGames{% endblock %}
 
 {% block content %}
-<div class="hero-section">
-    <div class="hero-content">
-        <h1 class="hero-title">
-            <span class="hero-emoji">🏒</span>
-            Аэрохоккей
-            <span class="hero-subtitle">Три Кота</span>
-        </h1>
-        <p class="hero-desc">Сражайся за ранг, собирай скины, поднимайся в рейтинге!</p>
+<section class="hub-layout">
+    <aside class="hub-sidebar">
+        <div class="hub-profile-card">
+            <div class="hub-profile-avatar">
+                {% if current_user.is_authenticated %}
+                    {% set hub_avatar = image_url(current_user.active_skin ~ '_ui') %}
+                    {% if hub_avatar %}
+                        <img src="{{ hub_avatar }}" alt="{{ current_user.username }}">
+                    {% else %}
+                        <span>{{ current_user.username[0] }}</span>
+                    {% endif %}
+                {% else %}
+                    <span>K</span>
+                {% endif %}
+            </div>
+            <div class="hub-profile-meta">
+                <strong>{{ current_user.username if current_user.is_authenticated else 'KotayraGames' }}</strong>
+                <span>{% if current_user.is_authenticated %}в лобби{% else %}игровой хаб{% endif %}</span>
+            </div>
+        </div>
 
-        <div class="hero-stats">
-            <div class="hero-stat">
-                <span class="stat-num" id="hero-online">{{ online_count }}</span>
-                <span class="stat-label">Онлайн</span>
+        <nav class="hub-menu">
+            <a href="{{ url_for('index') }}" class="hub-menu-item active">Главная</a>
+            <a href="{{ url_for('shop') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Инвентарь</a>
+            <a href="{{ url_for('profile') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Персонаж</a>
+            <a href="{{ url_for('chat_page') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Друзья</a>
+            <a href="{{ url_for('profile') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Рейтинг</a>
+            <a href="{{ url_for('shop') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Магазин</a>
+        </nav>
+    </aside>
+
+    <div class="hub-stage">
+        <div class="hub-statusbar">
+            <span class="hub-online-pill"><span class="hub-online-dot"></span>в лобби</span>
+            <span class="hub-brand-tag">KotayraGames</span>
+        </div>
+
+        <div class="hub-character">
+            {% set stage_skin = image_url((current_user.active_skin if current_user.is_authenticated else 'korzhik') ~ '_ui') %}
+            <div class="hub-character-card">
+                {% if stage_skin %}
+                    <img src="{{ stage_skin }}" alt="character" class="hub-character-image">
+                {% else %}
+                    <div class="hub-character-fallback">K</div>
+                {% endif %}
             </div>
-            <div class="hero-stat">
-                <span class="stat-num">{{ games_count }}</span>
-                <span class="stat-label">Игр сейчас</span>
+            <div class="hub-level-float">
+                {% if current_user.is_authenticated %}
+                    {{ current_user.faceit_level }}
+                {% else %}
+                    1
+                {% endif %}
             </div>
+        </div>
+    </div>
+
+    <aside class="hub-actions">
+        <div class="hub-top-controls">
+            {% if current_user.is_authenticated %}
+                <span class="hub-wallet">C {{ current_user.coins }}</span>
+            {% else %}
+                <span class="hub-wallet">ONLINE {{ online_count }}</span>
+            {% endif %}
+            <a href="{{ url_for('settings') if current_user.is_authenticated else url_for('login') }}" class="hub-settings-btn">Настройки</a>
+        </div>
+
+        <div class="hub-preview-card">
+            <div class="hub-preview-label">карта:</div>
+            <div class="hub-preview-arena"></div>
         </div>
 
         {% if current_user.is_authenticated %}
-            <a href="{{ url_for('lobby') }}" class="btn btn-hero">⚡ Найти матч</a>
+            <a href="{{ url_for('lobby') }}" class="hub-play-btn">ИГРАТЬ</a>
         {% else %}
-            <a href="{{ url_for('register') }}" class="btn btn-hero">🎮 Начать играть</a>
+            <a href="{{ url_for('register') }}" class="hub-play-btn">ИГРАТЬ</a>
         {% endif %}
-    </div>
-</div>
 
-<section class="characters-section">
-    <h2 class="section-title">Выбери героя</h2>
-    <div class="characters-grid">
-        {% set chars = [
-            ('kompot', 'Компот', 'Рыжий и отважный! Старший брат.', 'char-kompot'),
-            ('karamelka', 'Карамелька', 'Умная сестрёнка! Тактик.', 'char-karamelka'),
-            ('korzhik', 'Коржик', 'Спортивный и быстрый!', 'char-korzhik')
-        ] %}
-        {% for skin_id, name, desc, css_class in chars %}
-        <div class="character-card">
-            <div class="char-avatar {{ css_class }}">
-                {% set char_img = image_url(skin_id ~ '_ui') %}
-                {% if char_img %}
-                    <img src="{{ char_img }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">
-                {% else %}
-                    {% if skin_id == 'kompot' %}🐱{% elif skin_id == 'karamelka' %}🎀{% else %}⚽{% endif %}
-                {% endif %}
+        <div class="hub-select-card">
+            <span>режим: рейтинговый</span>
+        </div>
+        <div class="hub-select-card">
+            <span>карта: ледовый дворец</span>
+        </div>
+
+        <div class="hub-rating-card">
+            <div class="hub-rating-header">
+                <strong>Рейтинг</strong>
+                <span>топ</span>
             </div>
-            <h3>{{ name }}</h3>
-            <p>{{ desc }}</p>
+            {% for player in top_players[:3] %}
+            <div class="hub-rating-row">
+                <span>{{ loop.index }}</span>
+                <span>{{ player.username }}</span>
+                <span>{{ player.elo }}</span>
+            </div>
+            {% endfor %}
+            {% if not top_players %}
+            <div class="hub-rating-empty">Пока нет игроков в таблице.</div>
+            {% endif %}
         </div>
-        {% endfor %}
-    </div>
-</section>
-
-<section class="leaderboard-section">
-    <h2 class="section-title">🏆 Лидеры</h2>
-    <div class="leaderboard-table">
-        <div class="lb-header">
-            <span>#</span><span>Игрок</span><span>ELO</span><span>Ранг</span><span>WR</span><span>В/П</span>
-        </div>
-        {% for player in top_players %}
-        <div class="lb-row {% if current_user.is_authenticated and player.id == current_user.id %}lb-row-me{% endif %}">
-            <span class="lb-col-rank">
-                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
-            </span>
-            <span class="lb-col-name"><a href="{{ url_for('profile', user_id=player.id) }}">{{ player.username }}</a></span>
-            <span class="lb-col-elo" style="color: {{ player.rank_color }}; font-weight: 900;">{{ player.elo }}</span>
-            <span>
-                <span class="rank-badge" style="background: {{ player.rank_color }}20; color: {{ player.rank_color }}; border-color: {{ player.rank_color }}40">
-                    {{ player.rank_title }}
-                </span>
-            </span>
-            <span class="lb-col-wr">{{ player.winrate }}%</span>
-            <span class="lb-col-games">{{ player.wins }}/{{ player.losses }}</span>
-        </div>
-        {% endfor %}
-        {% if not top_players %}
-        <div class="lb-empty">Пока никто не играл 🚀</div>
-        {% endif %}
-    </div>
-</section>
-
-<section class="ranks-section">
-    <h2 class="section-title">⭐ Ранги</h2>
-    <div class="ranks-grid">
-        <div class="rank-card" style="--rc: #888888"><span class="rank-icon">🌱</span><span>Новичок</span><span class="rank-elo">&lt;800</span></div>
-        <div class="rank-card" style="--rc: #cc8844"><span class="rank-icon">🥉</span><span>Бронза</span><span class="rank-elo">800+</span></div>
-        <div class="rank-card" style="--rc: #cccccc"><span class="rank-icon">🥈</span><span>Серебро</span><span class="rank-elo">1000+</span></div>
-        <div class="rank-card" style="--rc: #ffdd44"><span class="rank-icon">🥇</span><span>Золото</span><span class="rank-elo">1200+</span></div>
-        <div class="rank-card" style="--rc: #44ffaa"><span class="rank-icon">💎</span><span>Платина</span><span class="rank-elo">1400+</span></div>
-        <div class="rank-card" style="--rc: #44ddff"><span class="rank-icon">💠</span><span>Алмаз</span><span class="rank-elo">1700+</span></div>
-        <div class="rank-card" style="--rc: #aa44ff"><span class="rank-icon">👑</span><span>Мастер</span><span class="rank-elo">2000+</span></div>
-        <div class="rank-card" style="--rc: #ff4444"><span class="rank-icon">🔥</span><span>Легенда</span><span class="rank-elo">2400+</span></div>
-    </div>
+    </aside>
 </section>
 {% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Личные сообщения | KotayraGames{% endblock %}
+
+{% block content %}
+<section class="messages-layout">
+    <aside class="messages-sidebar">
+        <div class="social-card">
+            <span class="section-kicker">DIALOGS</span>
+            <h2 class="section-title">Личные сообщения</h2>
+            {% if partners %}
+                {% for partner in partners %}
+                <a href="{{ url_for('messages_page', user_id=partner.id) }}" class="message-partner {% if selected_user and selected_user.id == partner.id %}active{% endif %}">
+                    <strong>{{ partner.username }}</strong>
+                    <span>ELO {{ partner.elo }} · LVL {{ partner.faceit_level }}</span>
+                </a>
+                {% endfor %}
+            {% else %}
+                <div class="social-empty">Пока нет диалогов.</div>
+            {% endif %}
+        </div>
+    </aside>
+
+    <div class="messages-main">
+        <div class="social-card messages-card">
+            {% if selected_user %}
+                <div class="messages-header">
+                    <div>
+                        <span class="section-kicker">CHAT</span>
+                        <h2 class="section-title">{{ selected_user.username }}</h2>
+                    </div>
+                    <span class="faceit-mini-level">ELO {{ selected_user.elo }}</span>
+                </div>
+
+                <div class="messages-thread">
+                    {% for msg in messages %}
+                    <div class="dm-bubble {% if msg.sender_id == current_user.id %}me{% endif %}">
+                        <div class="dm-text">{{ msg.message }}</div>
+                        <div class="dm-meta">{{ msg.created_at.strftime('%d.%m %H:%M') }}</div>
+                    </div>
+                    {% endfor %}
+                    {% if not messages %}
+                    <div class="social-empty">Напиши первым.</div>
+                    {% endif %}
+                </div>
+
+                <form method="POST" action="{{ url_for('send_direct_message') }}" class="dm-form">
+                    <input type="hidden" name="recipient_id" value="{{ selected_user.id }}">
+                    <input type="text" name="message" placeholder="Написать сообщение..." maxlength="1000" required>
+                    <button type="submit" class="btn btn-primary">Отправить</button>
+                </form>
+            {% else %}
+                <div class="social-empty">Выбери собеседника слева или перейди в Social и начни диалог.</div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

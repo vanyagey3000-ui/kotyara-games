@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Social | KotayraGames{% endblock %}
+
+{% block content %}
+<section class="social-grid">
+    <div class="social-column">
+        <div class="social-card">
+            <span class="section-kicker">FRIENDS</span>
+            <h2 class="section-title">Добавить друга</h2>
+            <form method="POST" action="{{ url_for('add_friend') }}" class="auth-form">
+                <input type="text" name="username" placeholder="Ник игрока" required>
+                <button type="submit" class="btn btn-primary">Отправить заявку</button>
+            </form>
+        </div>
+
+        <div class="social-card">
+            <span class="section-kicker">INCOMING</span>
+            <h2 class="section-title">Входящие заявки</h2>
+            {% if incoming_requests %}
+                {% for req in incoming_requests %}
+                <div class="social-row">
+                    <div>
+                        <strong>{{ req.sender.username if req.sender else 'Игрок' }}</strong>
+                        <div class="social-muted">Заявка в друзья</div>
+                    </div>
+                    <div class="social-actions">
+                        <form method="POST" action="{{ url_for('respond_friend_request') }}">
+                            <input type="hidden" name="request_id" value="{{ req.id }}">
+                            <input type="hidden" name="action" value="accept">
+                            <button class="btn btn-primary" type="submit">Принять</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('respond_friend_request') }}">
+                            <input type="hidden" name="request_id" value="{{ req.id }}">
+                            <input type="hidden" name="action" value="decline">
+                            <button class="btn btn-secondary" type="submit">Отклонить</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="social-empty">Новых заявок нет.</div>
+            {% endif %}
+        </div>
+
+        <div class="social-card">
+            <span class="section-kicker">TEAMMATE FINDER</span>
+            <h2 class="section-title">Поиск тиммейта</h2>
+            <form method="POST" action="{{ url_for('create_teamfinder_post') }}" class="auth-form">
+                <select name="mode" class="social-select">
+                    <option value="1v1">1x1</option>
+                    <option value="2v2">2x2</option>
+                    <option value="5v5">5x5</option>
+                </select>
+                <input type="text" name="note" placeholder="Например: нужен спокойный игрок на вечер" required>
+                <button type="submit" class="btn btn-primary">Опубликовать поиск</button>
+            </form>
+            {% if own_post %}
+            <form method="POST" action="{{ url_for('close_teamfinder_post') }}" style="margin-top: 12px;">
+                <button class="btn btn-secondary" type="submit">Закрыть мой поиск</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="social-column">
+        <div class="social-card">
+            <span class="section-kicker">PARTY</span>
+            <h2 class="section-title">Твоя пати</h2>
+            {% if party %}
+                <div class="social-party-members">
+                    {% for member in party.members %}
+                    <div class="social-row">
+                        <div>
+                            <strong>{{ member.username }}</strong>
+                            <div class="social-muted">ELO {{ member.elo }} · LVL {{ member.faceit_level }}{% if member.is_leader %} · лидер{% endif %}</div>
+                        </div>
+                        {% if party.leader_id == current_user.id and member.id != current_user.id %}
+                        <form method="POST" action="{{ url_for('invite_to_party') }}">
+                            <input type="hidden" name="user_id" value="{{ member.id }}">
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <form method="POST" action="{{ url_for('leave_party') }}" style="margin-top: 14px;">
+                    <button type="submit" class="btn btn-secondary">Выйти из пати</button>
+                </form>
+            {% else %}
+                <div class="social-empty">Пати еще нет.</div>
+                <form method="POST" action="{{ url_for('create_party') }}" style="margin-top: 14px;">
+                    <button type="submit" class="btn btn-primary">Создать пати</button>
+                </form>
+            {% endif %}
+        </div>
+
+        <div class="social-card">
+            <span class="section-kicker">PARTY INVITES</span>
+            <h2 class="section-title">Приглашения</h2>
+            {% if party_invites %}
+                {% for invite in party_invites %}
+                <div class="social-row">
+                    <div>
+                        <strong>Party #{{ invite.party_id }}</strong>
+                        <div class="social-muted">От игрока {{ invite.sender.username if invite.sender else 'Игрок' }}</div>
+                    </div>
+                    <div class="social-actions">
+                        <form method="POST" action="{{ url_for('respond_party_invite') }}">
+                            <input type="hidden" name="invite_id" value="{{ invite.id }}">
+                            <input type="hidden" name="action" value="accept">
+                            <button class="btn btn-primary" type="submit">Войти</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('respond_party_invite') }}">
+                            <input type="hidden" name="invite_id" value="{{ invite.id }}">
+                            <input type="hidden" name="action" value="decline">
+                            <button class="btn btn-secondary" type="submit">Отклонить</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="social-empty">Приглашений пока нет.</div>
+            {% endif %}
+        </div>
+
+        <div class="social-card">
+            <span class="section-kicker">PLAYERS</span>
+            <h2 class="section-title">Игроки для инвайта</h2>
+            {% for candidate in recent_users %}
+            <div class="social-row">
+                <div>
+                    <strong>{{ candidate.username }}</strong>
+                    <div class="social-muted">ELO {{ candidate.elo }} · LVL {{ candidate.faceit_level }}</div>
+                </div>
+                <div class="social-actions">
+                    <form method="POST" action="{{ url_for('invite_to_party') }}">
+                        <input type="hidden" name="user_id" value="{{ candidate.id }}">
+                        <button class="btn btn-secondary" type="submit">Инвайт</button>
+                    </form>
+                    <a href="{{ url_for('messages_page', user_id=candidate.id) }}" class="btn btn-primary">ЛС</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="social-column">
+        <div class="social-card">
+            <span class="section-kicker">FRIENDS LIST</span>
+            <h2 class="section-title">Твои друзья</h2>
+            {% if friends %}
+                {% for friend in friends %}
+                <div class="social-row">
+                    <div>
+                        <strong>{{ friend.username }}</strong>
+                        <div class="social-muted">ELO {{ friend.elo }} · LVL {{ friend.faceit_level }}</div>
+                    </div>
+                    <div class="social-actions">
+                        <form method="POST" action="{{ url_for('invite_to_party') }}">
+                            <input type="hidden" name="user_id" value="{{ friend.id }}">
+                            <button class="btn btn-secondary" type="submit">В пати</button>
+                        </form>
+                        <a href="{{ url_for('messages_page', user_id=friend.id) }}" class="btn btn-primary">ЛС</a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="social-empty">Пока нет друзей.</div>
+            {% endif %}
+        </div>
+
+        <div class="social-card">
+            <span class="section-kicker">TEAM POSTS</span>
+            <h2 class="section-title">Активные поиски</h2>
+            {% if team_posts %}
+                {% for post in team_posts %}
+                <div class="social-post">
+                    <div class="social-row social-row-top">
+                        <strong>{{ post.author.username if post.author else 'Игрок' }}</strong>
+                        <span class="faceit-mini-level">{{ post.mode }}</span>
+                    </div>
+                    <div class="social-muted">{{ post.note }}</div>
+                    <div class="social-post-actions">
+                        {% if post.author %}
+                        <a href="{{ url_for('messages_page', user_id=post.author.id) }}" class="btn btn-primary">Написать</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="social-empty">Сейчас никто не ищет тиммейта.</div>
+            {% endif %}
+        </div>
+
+        <div class="social-card">
+            <span class="section-kicker">MESSAGES</span>
+            <h2 class="section-title">Последние диалоги</h2>
+            {% if conversations %}
+                {% for partner in conversations %}
+                <a class="social-row social-row-link" href="{{ url_for('messages_page', user_id=partner.id) }}">
+                    <div>
+                        <strong>{{ partner.username }}</strong>
+                        <div class="social-muted">Открыть переписку</div>
+                    </div>
+                    <span>→</span>
+                </a>
+                {% endfor %}
+            {% else %}
+                <div class="social-empty">Диалогов пока нет.</div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}
