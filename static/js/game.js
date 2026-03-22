@@ -52,7 +52,6 @@ var INTERP_DELAY = 80;  // мс задержки рендера
 function addSnap(x, y, vx, vy) {
     puckBuf.push({t:performance.now(), x:x, y:y, vx:vx||0, vy:vy||0});
     if (puckBuf.length > 150) puckBuf.shift();
->>>>>>> e22a7f3feae3179580d4305bbbde95bdb4012306
 }
 
 function clearBuf(x, y) {
@@ -181,8 +180,6 @@ function initGame(){
     // ═══ ПОЛУЧАЕМ ДАННЫЕ ОТ СЕРВЕРА ═══
     sock.on('game_state',function(state){
         gs=state;
-
-<<<<<<< HEAD
         // Шайба — ВСЕГДА от сервера
         if (state.puck) {
             var packetNow = performance.now();
@@ -197,14 +194,12 @@ function initGame(){
             puck.y = state.puck.y;
             puck.vx = state.puck.vx || 0;
             puck.vy = state.puck.vy || 0;
-=======
         // Переход состояний
         if(state.state!==prevState){
             if(state.state==='countdown'||state.state==='waiting'){
                 clearBuf(state.puck?state.puck.x:FW/2, state.puck?state.puck.y:FH/2);
             }
             prevState=state.state;
->>>>>>> e22a7f3feae3179580d4305bbbde95bdb4012306
         }
 
         // Шайба — добавляем в буфер (ТОЛЬКО при playing)
