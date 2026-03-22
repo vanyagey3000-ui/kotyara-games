@@ -14,7 +14,6 @@ var myX = 80, myY = FH / 2;
 var mouseX = 400, mouseY = 250;
 var lastSend = 0;
 
-// Позиции для рендера
 var puck = {x: FW/2, y: FH/2, vx: 0, vy: 0};
 var enemyPad = {x: FW-80, y: FH/2};
 var drawPuck = {x: FW/2, y: FH/2};
@@ -25,20 +24,8 @@ var goalFlash = 0;
 var trail = [];
 var TRAIL_MAX = 16;
 
-var connMode = localStorage.getItem('conn_type') || 'p2p';
 var p2pActive = false;
 var isHost = false;
-
-// Физика шайбы (ТОЛЬКО хост считает)
-var FRICTION = 0.995;
-var BOUNCE = 0.85;
-var SPEED_LIMIT = 18;
-
-// Флаг: кто управляет шайбой
-// 'server' — сервер считает и шлёт game_state
-// 'p2p_host' — я хост, я считаю физику
-// 'p2p_guest' — я гость, получаю от хоста
-var physicsAuthority = 'server';
 
 var imgs = {};
 var bgImg = null;
@@ -86,83 +73,6 @@ initCanvas();
 function fmt(s) { var m=Math.floor(s/60),sec=Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
 function clamp(v,a,b) { return v<a?a:v>b?b:v; }
 function lerp(a,b,t) { return a+(b-a)*t; }
-function dist(x1,y1,x2,y2) { return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)); }
-
-// ═══ PUCK PHYSICS (ТОЛЬКО хост считает) ═══
-
-function resetPuck() {
-    puck.x = FW / 2;
-    puck.y = FH / 2;
-    var angle = (Math.random() - 0.5);
-    var dir = Math.random() < 0.5 ? -1 : 1;
-    puck.vx = 5 * dir * Math.cos(angle);
-    puck.vy = 5 * Math.sin(angle);
-}
-
-function updatePuckPhysics() {
-    // Эту функцию вызывает ТОЛЬКО хост в P2P режиме
-    puck.x += puck.vx;
-    puck.y += puck.vy;
-    puck.vx *= FRICTION;
-    puck.vy *= FRICTION;
-
-    var spd = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-    if (spd > SPEED_LIMIT) {
-        puck.vx *= SPEED_LIMIT / spd;
-        puck.vy *= SPEED_LIMIT / spd;
-    }
-
-    if (puck.y - PKR <= 0) {
-        puck.y = PKR;
-        puck.vy = Math.abs(puck.vy) * BOUNCE;
-    }
-    if (puck.y + PKR >= FH) {
-        puck.y = FH - PKR;
-        puck.vy = -Math.abs(puck.vy) * BOUNCE;
-    }
-
-    if (puck.x - PKR <= 0) {
-        if (puck.y > GY1 && puck.y < GY2) {
-            return 2; // Гол в левые ворота
-        }
-        puck.x = PKR;
-        puck.vx = Math.abs(puck.vx) * BOUNCE;
-    }
-    if (puck.x + PKR >= FW) {
-        if (puck.y > GY1 && puck.y < GY2) {
-            return 1; // Гол в правые ворота
-        }
-        puck.x = FW - PKR;
-        puck.vx = -Math.abs(puck.vx) * BOUNCE;
-    }
-
-    // Столкновение с обеими клюшками
-    collidePaddle(myX, myY);
-    collidePaddle(enemyPad.x, enemyPad.y);
-
-    return 0;
-}
-
-function collidePaddle(padX, padY) {
-    var dx = puck.x - padX;
-    var dy = puck.y - padY;
-    var d = dist(puck.x, puck.y, padX, padY);
-    var minD = PKR + PR;
-
-    if (d < minD && d > 0.1) {
-        var nx = dx / d;
-        var ny = dy / d;
-        var overlap = minD - d;
-        puck.x += nx * overlap;
-        puck.y += ny * overlap;
-
-        var dot = puck.vx * nx + puck.vy * ny;
-        if (dot < 0) {
-            puck.vx -= 2.2 * dot * nx;
-            puck.vy -= 2.2 * dot * ny;
-        }
-    }
-}
 
 // ═══ SOCKET ═══
 
@@ -180,28 +90,19 @@ function initGame() {
         gs = d.state;
         connected = true;
         isHost = (myNum === 1);
-        physicsAuthority = 'server'; // По умолчанию сервер
         document.getElementById('waiting-overlay').style.display = 'none';
         syncFull(d.state);
 
-        if (connMode === 'p2p' && typeof P2P !== 'undefined') {
+        // P2P — ТОЛЬКО для позиций клюшек (меньше лага)
+        if (typeof P2P !== 'undefined') {
             P2P.onConnect = function() {
                 p2pActive = true;
-                // Переключаем авторитет физики
-                if (isHost) {
-                    physicsAuthority = 'p2p_host';
-                    // Сообщаем серверу что P2P активен
-                    sock.emit('p2p_established', {room_id: ROOM_ID});
-                } else {
-                    physicsAuthority = 'p2p_guest';
-                }
-                toast('P2P подключено! Минимальный лаг.');
-                console.log('P2P: physics authority = ' + physicsAuthority);
+                toast('P2P подключено! Клюшки без лага.');
+                console.log('P2P: connected, paddles go direct');
             };
             P2P.onDisconnect = function() {
                 p2pActive = false;
-                physicsAuthority = 'server'; // Fallback на сервер
-                console.log('P2P: disconnected, fallback to server');
+                console.log('P2P: disconnected, paddles via server');
             };
             P2P.onMessage = function(msg) {
                 onP2PMsg(msg);
@@ -210,43 +111,41 @@ function initGame() {
         }
     });
 
+    // ═══ ВСЯ ФИЗИКА ОТ СЕРВЕРА — ВСЕГДА ═══
     sock.on('game_state', function(state) {
         gs = state;
 
-        // Countdown всегда от сервера
+        // Шайба — ВСЕГДА от сервера
+        if (state.puck) {
+            puck.x = state.puck.x;
+            puck.y = state.puck.y;
+            puck.vx = state.puck.vx || 0;
+            puck.vy = state.puck.vy || 0;
+        }
+
+        // Клюшка противника — от сервера (P2P перезаписывает быстрее)
+        var en = myNum === 1 ? '2' : '1';
+        if (!p2pActive && state.paddles && state.paddles[en]) {
+            enemyPad.x = state.paddles[en].x;
+            enemyPad.y = state.paddles[en].y;
+        }
+
+        // Счёт
+        if (state.score) {
+            if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
+                goalFlash = 25;
+                trail = [];
+            }
+            score = [state.score[0], state.score[1]];
+        }
+
+        // Countdown
         if (state.state === 'countdown') {
             document.getElementById('countdown-overlay').style.display = 'flex';
             document.getElementById('countdown-num').textContent = state.countdown || '...';
             syncFull(state);
-            return;
         } else {
             document.getElementById('countdown-overlay').style.display = 'none';
-        }
-
-        if (physicsAuthority === 'server') {
-            // ═══ СЕРВЕРНЫЙ РЕЖИМ: всё от сервера ═══
-            if (state.puck) {
-                puck.x = state.puck.x;
-                puck.y = state.puck.y;
-                puck.vx = state.puck.vx || 0;
-                puck.vy = state.puck.vy || 0;
-            }
-            var en = myNum === 1 ? '2' : '1';
-            if (state.paddles && state.paddles[en]) {
-                enemyPad.x = state.paddles[en].x;
-                enemyPad.y = state.paddles[en].y;
-            }
-            if (state.score) {
-                if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
-                    goalFlash = 25; trail = [];
-                }
-                score = [state.score[0], state.score[1]];
-            }
-        } else {
-            // ═══ P2P РЕЖИМ: от сервера только счёт и таймер ═══
-            if (state.score) {
-                score = [state.score[0], state.score[1]];
-            }
         }
 
         updateHUD(state);
@@ -269,33 +168,11 @@ function initGame() {
     }, 10000);
 }
 
+// P2P — только позиция клюшки противника
 function onP2PMsg(msg) {
     if (msg.t === 'pos') {
         enemyPad.x = msg.x;
         enemyPad.y = msg.y;
-    }
-    if (msg.t === 'puck' && physicsAuthority === 'p2p_guest') {
-        // Гость применяет позицию шайбы от хоста напрямую
-        puck.x = msg.x;
-        puck.y = msg.y;
-        puck.vx = msg.vx;
-        puck.vy = msg.vy;
-        // Также обновляем draw позицию чтобы не было рывков
-        drawPuck.x = lerp(drawPuck.x, msg.x, 0.8);
-        drawPuck.y = lerp(drawPuck.y, msg.y, 0.8);
-    }
-    if (msg.t === 'goal') {
-        score = [msg.s0, msg.s1];
-        goalFlash = 25;
-        trail = [];
-        updateHUDScore();
-    }
-    if (msg.t === 'reset') {
-        puck.x = drawPuck.x = msg.x;
-        puck.y = drawPuck.y = msg.y;
-        puck.vx = msg.vx;
-        puck.vy = msg.vy;
-        trail = [];
     }
 }
 
@@ -318,11 +195,6 @@ function syncFull(state) {
     }
     if (state.score) score = [state.score[0], state.score[1]];
     trail = [];
-}
-
-function updateHUDScore() {
-    document.getElementById('score-p1').textContent = score[0];
-    document.getElementById('score-p2').textContent = score[1];
 }
 
 // ═══ INPUT ═══
@@ -358,8 +230,8 @@ function toast(msg) {
 
 function updateHUD(s) {
     if (!s) return;
-    document.getElementById('score-p1').textContent = s.score ? s.score[0] : score[0];
-    document.getElementById('score-p2').textContent = s.score ? s.score[1] : score[1];
+    document.getElementById('score-p1').textContent = score[0];
+    document.getElementById('score-p2').textContent = score[1];
     if (s.players) {
         if (s.players['1']) {
             document.getElementById('hud-p1-name').textContent = s.players['1'].username;
@@ -392,8 +264,6 @@ function showResult(result) {
 
 // ═══ GAME LOOP ═══
 
-var p2pSendCounter = 0;
-
 function gameLoop() {
     update();
     render();
@@ -405,7 +275,7 @@ function update() {
     var playing = (gs.state === 'playing');
 
     if (playing) {
-        // ═══ МОЯ КЛЮШКА ═══
+        // Моя клюшка
         var mx = mouseX, my = mouseY;
         if (myNum === 1) mx = clamp(mx, PR, FW/2-PR);
         else mx = clamp(mx, FW/2+PR, FW-PR);
@@ -416,7 +286,7 @@ function update() {
         if (now - lastSend > 16) {
             lastSend = now;
 
-            // Серверу всегда отправляем позицию клюшки
+            // Серверу — всегда
             if (sock && connected) {
                 sock.volatile.emit('paddle_move', {
                     x: Math.round(mx*10)/10,
@@ -424,78 +294,16 @@ function update() {
                 });
             }
 
-            // P2P — отправляем позицию клюшки противнику напрямую
+            // P2P — напрямую противнику (быстрее чем через сервер)
             if (p2pActive && typeof P2P !== 'undefined') {
                 P2P.send({t:'pos', x:Math.round(mx*10)/10, y:Math.round(my*10)/10});
             }
         }
-
-        // ═══ ФИЗИКА ШАЙБЫ ═══
-        if (physicsAuthority === 'p2p_host') {
-            // Я хост — я считаю физику
-            var goalBy = updatePuckPhysics();
-
-            if (goalBy > 0) {
-                score[goalBy - 1]++;
-                goalFlash = 25;
-                trail = [];
-                updateHUDScore();
-
-                // Сообщаем гостю о голе
-                P2P.send({t:'goal', s0:score[0], s1:score[1]});
-
-                // Сообщаем серверу
-                if (sock && connected) {
-                    sock.emit('p2p_goal', {
-                        room_id: ROOM_ID,
-                        scorer: goalBy,
-                        score: score
-                    });
-                }
-
-                // Сбрасываем шайбу
-                resetPuck();
-
-                // Сообщаем гостю новую позицию шайбы
-                P2P.send({
-                    t:'reset',
-                    x: puck.x, y: puck.y,
-                    vx: puck.vx, vy: puck.vy
-                });
-            }
-
-            // Отправляем позицию шайбы гостю каждый кадр
-            p2pSendCounter++;
-            if (p2pSendCounter % 2 === 0) {
-                P2P.send({
-                    t:'puck',
-                    x:Math.round(puck.x*10)/10,
-                    y:Math.round(puck.y*10)/10,
-                    vx:Math.round(puck.vx*100)/100,
-                    vy:Math.round(puck.vy*100)/100
-                });
-            }
-        }
-        // physicsAuthority === 'p2p_guest': ничего не считаем, данные приходят через onP2PMsg
-        // physicsAuthority === 'server': данные приходят через game_state
     }
 
-    // ═══ ИНТЕРПОЛЯЦИЯ ДЛЯ РЕНДЕРА ═══
-    if (physicsAuthority === 'p2p_host') {
-        // Хост — без интерполяции шайбы, она уже точная
-        drawPuck.x = puck.x;
-        drawPuck.y = puck.y;
-    } else if (physicsAuthority === 'p2p_guest') {
-        // Гость — мягкая интерполяция к данным от хоста
-        drawPuck.x = lerp(drawPuck.x, puck.x, 0.6);
-        drawPuck.y = lerp(drawPuck.y, puck.y, 0.6);
-    } else {
-        // Сервер — стандартная интерполяция
-        drawPuck.x = lerp(drawPuck.x, puck.x, 0.4);
-        drawPuck.y = lerp(drawPuck.y, puck.y, 0.4);
-    }
-
-    // Клюшка противника — всегда интерполируем
+    // Интерполяция для плавного рендера
+    drawPuck.x = lerp(drawPuck.x, puck.x, 0.5);
+    drawPuck.y = lerp(drawPuck.y, puck.y, 0.5);
     drawEnemy.x = lerp(drawEnemy.x, enemyPad.x, p2pActive ? 0.7 : 0.4);
     drawEnemy.y = lerp(drawEnemy.y, enemyPad.y, p2pActive ? 0.7 : 0.4);
 
@@ -559,16 +367,11 @@ function render() {
     drawPad(drawEnemy.x*sx,drawEnemy.y*sy,PR*s,enN,false,s);
     drawPad(myX*sx,myY*sy,PR*s,myN,true,s);
 
-    // Индикатор режима
-    if(p2pActive){
-        ctx.fillStyle='#52b788';ctx.beginPath();ctx.arc(W-20,20,6,0,Math.PI*2);ctx.fill();
-        ctx.font='bold 10px Nunito,sans-serif';ctx.fillStyle='#52b788';ctx.textAlign='right';
-        ctx.fillText('P2P' + (isHost ? ' HOST' : ' GUEST'),W-30,24);
-    } else {
-        ctx.fillStyle='#e6b800';ctx.beginPath();ctx.arc(W-20,20,6,0,Math.PI*2);ctx.fill();
-        ctx.font='bold 10px Nunito,sans-serif';ctx.fillStyle='#e6b800';ctx.textAlign='right';
-        ctx.fillText('SERVER',W-30,24);
-    }
+    // Индикатор
+    ctx.fillStyle = p2pActive ? '#52b788' : '#e6b800';
+    ctx.beginPath();ctx.arc(W-20,20,6,0,Math.PI*2);ctx.fill();
+    ctx.font='bold 10px Nunito,sans-serif';ctx.textAlign='right';
+    ctx.fillText(p2pActive ? 'P2P' : 'WS', W-30, 24);
 }
 
 function rRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.arcTo(x+w,y,x+w,y+r,r);c.lineTo(x+w,y+h-r);c.arcTo(x+w,y+h,x+w-r,y+h,r);c.lineTo(x+r,y+h);c.arcTo(x,y+h,x,y+h-r,r);c.lineTo(x,y+r);c.arcTo(x,y,x+r,y,r);c.closePath();}
