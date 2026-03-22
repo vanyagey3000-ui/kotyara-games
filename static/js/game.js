@@ -14,13 +14,9 @@ var myX = 80, myY = FH / 2;
 var mouseX = 400, mouseY = 250;
 var lastSend = 0;
 
-// ═══ ШАЙБА: локальная симуляция + серверная коррекция ═══
-var puck = {x: FW/2, y: FH/2, vx: 0, vy: 0};          // локальная симуляция
-var serverPuck = {x: FW/2, y: FH/2, vx: 0, vy: 0};     // последние данные от сервера
-var drawPuck = {x: FW/2, y: FH/2};                       // что рисуем
-
+// Шайба — клиентская симуляция
+var puck = {x: FW/2, y: FH/2, vx: 0, vy: 0};
 var enemyPad = {x: FW-80, y: FH/2};
-var drawEnemy = {x: FW-80, y: FH/2};
 
 var score = [0, 0];
 var goalFlash = 0;
@@ -30,12 +26,14 @@ var TRAIL_MAX = 16;
 var p2pActive = false;
 var isHost = false;
 
-// Физические константы (такие же как на сервере!)
+// Физика (идентично серверу)
 var FRICTION = 0.995;
 var BOUNCE = 0.85;
 var SPEED_LIMIT = 18;
 
-var lastFrameTime = 0;
+// Серверная коррекция
+var serverPuck = {x: FW/2, y: FH/2, vx: 0, vy: 0};
+var gotFirstState = false;
 
 var imgs = {};
 var bgImg = null;
@@ -85,155 +83,120 @@ function clamp(v,a,b) { return v<a?a:v>b?b:v; }
 function lerp(a,b,t) { return a+(b-a)*t; }
 function dist(x1,y1,x2,y2) { return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)); }
 
-// ═══════════════════════════════════════════════
-// ЛОКАЛЬНАЯ ФИЗИКА ШАЙБЫ (предикция между пакетами)
-// Точно такая же как на сервере!
-// ═══════════════════════════════════════════════
+// ═══ ЛОКАЛЬНАЯ ФИЗИКА ШАЙБЫ (60fps всегда) ═══
 
-function simulatePuckStep() {
-    // Движение
+function simPuck() {
     puck.x += puck.vx;
     puck.y += puck.vy;
     puck.vx *= FRICTION;
     puck.vy *= FRICTION;
 
-    // Лимит скорости
-    var spd = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+    var spd = Math.sqrt(puck.vx*puck.vx + puck.vy*puck.vy);
     if (spd > SPEED_LIMIT) {
-        var ratio = SPEED_LIMIT / spd;
-        puck.vx *= ratio;
-        puck.vy *= ratio;
+        puck.vx *= SPEED_LIMIT/spd;
+        puck.vy *= SPEED_LIMIT/spd;
     }
 
-    // Отскок от верхней/нижней стены
-    if (puck.y - PKR <= 0) {
-        puck.y = PKR;
-        puck.vy = Math.abs(puck.vy) * BOUNCE;
-    }
-    if (puck.y + PKR >= FH) {
-        puck.y = FH - PKR;
-        puck.vy = -Math.abs(puck.vy) * BOUNCE;
-    }
+    if (puck.y - PKR <= 0) { puck.y = PKR; puck.vy = Math.abs(puck.vy)*BOUNCE; }
+    if (puck.y + PKR >= FH) { puck.y = FH-PKR; puck.vy = -Math.abs(puck.vy)*BOUNCE; }
 
-    // Отскок от левой стены (вне ворот)
     if (puck.x - PKR <= 0) {
         if (!(puck.y > GY1 && puck.y < GY2)) {
-            puck.x = PKR;
-            puck.vx = Math.abs(puck.vx) * BOUNCE;
+            puck.x = PKR; puck.vx = Math.abs(puck.vx)*BOUNCE;
         }
     }
-
-    // Отскок от правой стены (вне ворот)
     if (puck.x + PKR >= FW) {
         if (!(puck.y > GY1 && puck.y < GY2)) {
-            puck.x = FW - PKR;
-            puck.vx = -Math.abs(puck.vx) * BOUNCE;
+            puck.x = FW-PKR; puck.vx = -Math.abs(puck.vx)*BOUNCE;
         }
     }
 
-    // Столкновение с моей клюшкой
-    collidePaddle(myX, myY);
-
-    // Столкновение с клюшкой противника
-    collidePaddle(drawEnemy.x, drawEnemy.y);
+    hitPad(myX, myY);
+    hitPad(enemyPad.x, enemyPad.y);
 }
 
-function collidePaddle(padX, padY) {
-    var dx = puck.x - padX;
-    var dy = puck.y - padY;
-    var d = dist(puck.x, puck.y, padX, padY);
-    var minD = PKR + PR;
-
+function hitPad(px, py) {
+    var dx = puck.x-px, dy = puck.y-py;
+    var d = Math.sqrt(dx*dx+dy*dy);
+    var minD = PKR+PR;
     if (d < minD && d > 0.1) {
-        var nx = dx / d;
-        var ny = dy / d;
-        var overlap = minD - d;
-        puck.x += nx * overlap;
-        puck.y += ny * overlap;
-
-        var dot = puck.vx * nx + puck.vy * ny;
+        var nx=dx/d, ny=dy/d;
+        puck.x += nx*(minD-d);
+        puck.y += ny*(minD-d);
+        var dot = puck.vx*nx + puck.vy*ny;
         if (dot < 0) {
-            puck.vx -= 2.2 * dot * nx;
-            puck.vy -= 2.2 * dot * ny;
+            puck.vx -= 2.2*dot*nx;
+            puck.vy -= 2.2*dot*ny;
         }
     }
-}
-
-// Коррекция: плавно подтягиваем локальную шайбу к серверной
-function correctPuckToServer() {
-    var dx = serverPuck.x - puck.x;
-    var dy = serverPuck.y - puck.y;
-    var error = Math.sqrt(dx * dx + dy * dy);
-
-    if (error > 50) {
-        // Большая рассинхронизация — телепорт
-        puck.x = serverPuck.x;
-        puck.y = serverPuck.y;
-        puck.vx = serverPuck.vx;
-        puck.vy = serverPuck.vy;
-    } else if (error > 3) {
-        // Средняя ошибка — плавная коррекция позиции
-        puck.x = lerp(puck.x, serverPuck.x, 0.3);
-        puck.y = lerp(puck.y, serverPuck.y, 0.3);
-    }
-
-    // Скорость всегда подтягиваем к серверной
-    puck.vx = lerp(puck.vx, serverPuck.vx, 0.2);
-    puck.vy = lerp(puck.vy, serverPuck.vy, 0.2);
 }
 
 // ═══ SOCKET ═══
 
 function initGame() {
-    sock = io({transports: ['websocket', 'polling'], reconnection: true});
+    sock = io({transports:['websocket','polling'], reconnection:true});
 
-    sock.on('connect', function() {
-        sock.emit('join_game', {room_id: ROOM_ID});
-    });
-    sock.on('disconnect', function() { connected = false; });
-    sock.on('reconnect', function() { sock.emit('join_game', {room_id: ROOM_ID}); });
+    sock.on('connect', function() { sock.emit('join_game', {room_id:ROOM_ID}); });
+    sock.on('disconnect', function() { connected=false; });
+    sock.on('reconnect', function() { sock.emit('join_game', {room_id:ROOM_ID}); });
 
     sock.on('game_joined', function(d) {
         myNum = d.player_number;
         gs = d.state;
         connected = true;
-        isHost = (myNum === 1);
-        document.getElementById('waiting-overlay').style.display = 'none';
+        isHost = (myNum===1);
+        document.getElementById('waiting-overlay').style.display='none';
         syncFull(d.state);
 
-        // P2P — только для клюшек
         if (typeof P2P !== 'undefined') {
-            P2P.onConnect = function() {
-                p2pActive = true;
-                toast('P2P подключено!');
-            };
-            P2P.onDisconnect = function() {
-                p2pActive = false;
-            };
+            P2P.onConnect = function() { p2pActive=true; toast('P2P подключено!'); };
+            P2P.onDisconnect = function() { p2pActive=false; };
             P2P.onMessage = function(msg) {
-                if (msg.t === 'pos') {
-                    enemyPad.x = msg.x;
-                    enemyPad.y = msg.y;
-                }
+                if (msg.t==='pos') { enemyPad.x=msg.x; enemyPad.y=msg.y; }
             };
             P2P.init(sock, ROOM_ID, isHost);
         }
     });
 
-    // ═══ СЕРВЕР ШЛЁТ СОСТОЯНИЕ — мы КОРРЕКТИРУЕМ локальную симуляцию ═══
     sock.on('game_state', function(state) {
         gs = state;
 
-        // Шайба от сервера — сохраняем как "правильную"
+        // Сохраняем серверную позицию шайбы
         if (state.puck) {
             serverPuck.x = state.puck.x;
             serverPuck.y = state.puck.y;
             serverPuck.vx = state.puck.vx || 0;
             serverPuck.vy = state.puck.vy || 0;
+
+            if (!gotFirstState) {
+                // Первый пакет — телепорт
+                puck.x = serverPuck.x;
+                puck.y = serverPuck.y;
+                puck.vx = serverPuck.vx;
+                puck.vy = serverPuck.vy;
+                gotFirstState = true;
+            } else {
+                // Мягкая коррекция — ТОЛЬКО когда приходит пакет
+                var err = dist(puck.x, puck.y, serverPuck.x, serverPuck.y);
+                if (err > 80) {
+                    // Телепорт при большой ошибке
+                    puck.x = serverPuck.x;
+                    puck.y = serverPuck.y;
+                    puck.vx = serverPuck.vx;
+                    puck.vy = serverPuck.vy;
+                } else if (err > 5) {
+                    // Мягко подтянуть
+                    puck.x = lerp(puck.x, serverPuck.x, 0.15);
+                    puck.y = lerp(puck.y, serverPuck.y, 0.15);
+                }
+                // Скорость подтягиваем всегда немного
+                puck.vx = lerp(puck.vx, serverPuck.vx, 0.1);
+                puck.vy = lerp(puck.vy, serverPuck.vy, 0.1);
+            }
         }
 
-        // Клюшка противника от сервера (если нет P2P)
-        var en = myNum === 1 ? '2' : '1';
+        // Клюшка противника (без P2P)
+        var en = myNum===1?'2':'1';
         if (!p2pActive && state.paddles && state.paddles[en]) {
             enemyPad.x = state.paddles[en].x;
             enemyPad.y = state.paddles[en].y;
@@ -241,29 +204,26 @@ function initGame() {
 
         // Счёт
         if (state.score) {
-            if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
-                goalFlash = 25;
-                trail = [];
-                // При голе — полный сброс позиции шайбы
+            if (state.score[0]!==score[0] || state.score[1]!==score[1]) {
+                goalFlash=25; trail=[];
+                // При голе — полный сброс к серверу
                 if (state.puck) {
                     puck.x = state.puck.x;
                     puck.y = state.puck.y;
-                    puck.vx = state.puck.vx || 0;
-                    puck.vy = state.puck.vy || 0;
-                    drawPuck.x = puck.x;
-                    drawPuck.y = puck.y;
+                    puck.vx = state.puck.vx||0;
+                    puck.vy = state.puck.vy||0;
                 }
             }
             score = [state.score[0], state.score[1]];
         }
 
-        // Countdown
-        if (state.state === 'countdown') {
-            document.getElementById('countdown-overlay').style.display = 'flex';
-            document.getElementById('countdown-num').textContent = state.countdown || '...';
+        if (state.state==='countdown') {
+            document.getElementById('countdown-overlay').style.display='flex';
+            document.getElementById('countdown-num').textContent=state.countdown||'...';
             syncFull(state);
+            gotFirstState = false;
         } else {
-            document.getElementById('countdown-overlay').style.display = 'none';
+            document.getElementById('countdown-overlay').style.display='none';
         }
 
         updateHUD(state);
@@ -272,112 +232,83 @@ function initGame() {
     sock.on('game_finished', showResult);
     sock.on('player_disconnected', function() { toast('Противник отключился!'); });
     sock.on('game_error', function(d) {
-        var w = document.querySelector('.waiting-card');
-        if (w) w.innerHTML = '<p style="color:#e63946;font-weight:700">' + d.error +
+        var w=document.querySelector('.waiting-card');
+        if(w) w.innerHTML='<p style="color:#e63946;font-weight:700">'+d.error+
             '</p><a href="/lobby" class="btn btn-primary" style="margin-top:16px">Назад</a>';
     });
-
-    setTimeout(function() {
-        if (!connected) {
-            var w = document.querySelector('.waiting-card');
-            if (w && !w.querySelector('a'))
-                w.innerHTML += '<br><a href="/lobby" class="btn btn-primary" style="margin-top:12px">Назад</a>';
-        }
-    }, 10000);
 }
 
 function syncFull(state) {
     if (!state) return;
-    var my = String(myNum), en = myNum === 1 ? '2' : '1';
-    if (state.paddles && state.paddles[my]) {
-        myX = state.paddles[my].x; myY = state.paddles[my].y;
-        mouseX = myX; mouseY = myY;
+    var my=String(myNum), en=myNum===1?'2':'1';
+    if (state.paddles&&state.paddles[my]) {
+        myX=state.paddles[my].x; myY=state.paddles[my].y;
+        mouseX=myX; mouseY=myY;
     }
-    if (state.paddles && state.paddles[en]) {
-        enemyPad.x = drawEnemy.x = state.paddles[en].x;
-        enemyPad.y = drawEnemy.y = state.paddles[en].y;
+    if (state.paddles&&state.paddles[en]) {
+        enemyPad.x=state.paddles[en].x;
+        enemyPad.y=state.paddles[en].y;
     }
     if (state.puck) {
-        puck.x = drawPuck.x = serverPuck.x = state.puck.x;
-        puck.y = drawPuck.y = serverPuck.y = state.puck.y;
-        puck.vx = serverPuck.vx = state.puck.vx || 0;
-        puck.vy = serverPuck.vy = state.puck.vy || 0;
+        puck.x=serverPuck.x=state.puck.x;
+        puck.y=serverPuck.y=state.puck.y;
+        puck.vx=serverPuck.vx=state.puck.vx||0;
+        puck.vy=serverPuck.vy=state.puck.vy||0;
     }
-    if (state.score) score = [state.score[0], state.score[1]];
-    trail = [];
+    if (state.score) score=[state.score[0],state.score[1]];
+    trail=[];
 }
 
 // ═══ INPUT ═══
 
-function getGamePos(cx, cy) {
-    var r = canvas.getBoundingClientRect();
-    return { x: (cx-r.left)*(FW/canvas.width), y: (cy-r.top)*(FH/canvas.height) };
+function getGamePos(cx,cy) {
+    var r=canvas.getBoundingClientRect();
+    return {x:(cx-r.left)*(FW/canvas.width), y:(cy-r.top)*(FH/canvas.height)};
 }
-
-canvas.addEventListener('mousemove', function(e) {
-    var p = getGamePos(e.clientX, e.clientY); mouseX = p.x; mouseY = p.y;
-});
-canvas.addEventListener('touchmove', function(e) {
-    e.preventDefault(); var t=e.touches[0]; var p=getGamePos(t.clientX,t.clientY); mouseX=p.x; mouseY=p.y;
-}, {passive:false});
-canvas.addEventListener('touchstart', function(e) {
-    e.preventDefault(); var t=e.touches[0]; var p=getGamePos(t.clientX,t.clientY); mouseX=p.x; mouseY=p.y;
-}, {passive:false});
-document.addEventListener('touchmove', function(e) {
-    if (document.getElementById('game-canvas')) e.preventDefault();
-}, {passive:false});
+canvas.addEventListener('mousemove', function(e) { var p=getGamePos(e.clientX,e.clientY); mouseX=p.x; mouseY=p.y; });
+canvas.addEventListener('touchmove', function(e) { e.preventDefault(); var t=e.touches[0]; var p=getGamePos(t.clientX,t.clientY); mouseX=p.x; mouseY=p.y; }, {passive:false});
+canvas.addEventListener('touchstart', function(e) { e.preventDefault(); var t=e.touches[0]; var p=getGamePos(t.clientX,t.clientY); mouseX=p.x; mouseY=p.y; }, {passive:false});
+document.addEventListener('touchmove', function(e) { if(document.getElementById('game-canvas')) e.preventDefault(); }, {passive:false});
 
 function toast(msg) {
-    var old = document.getElementById('game-toast');
-    if (old) old.remove();
-    var t = document.createElement('div');
-    t.id = 'game-toast';
-    t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.95);color:#1a1a2e;padding:12px 24px;border-radius:12px;font-weight:700;z-index:9999;font-family:Nunito,sans-serif;border:3px solid #1a1a2e;box-shadow:0 4px 0 rgba(0,0,0,0.2)';
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function() { if (t.parentNode) t.remove(); }, 3000);
+    var old=document.getElementById('game-toast'); if(old) old.remove();
+    var t=document.createElement('div'); t.id='game-toast';
+    t.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.95);color:#1a1a2e;padding:12px 24px;border-radius:12px;font-weight:700;z-index:9999;font-family:Nunito,sans-serif;border:3px solid #1a1a2e;box-shadow:0 4px 0 rgba(0,0,0,0.2)';
+    t.textContent=msg; document.body.appendChild(t);
+    setTimeout(function(){if(t.parentNode)t.remove();},3000);
 }
 
 function updateHUD(s) {
-    if (!s) return;
-    document.getElementById('score-p1').textContent = score[0];
-    document.getElementById('score-p2').textContent = score[1];
-    if (s.players) {
-        if (s.players['1']) {
-            document.getElementById('hud-p1-name').textContent = s.players['1'].username;
-            document.getElementById('hud-p1-elo').textContent = s.players['1'].elo + ' ELO';
-        }
-        if (s.players['2']) {
-            document.getElementById('hud-p2-name').textContent = s.players['2'].username;
-            document.getElementById('hud-p2-elo').textContent = s.players['2'].elo + ' ELO';
-        }
+    if(!s) return;
+    document.getElementById('score-p1').textContent=score[0];
+    document.getElementById('score-p2').textContent=score[1];
+    if(s.players) {
+        if(s.players['1']) { document.getElementById('hud-p1-name').textContent=s.players['1'].username; document.getElementById('hud-p1-elo').textContent=s.players['1'].elo+' ELO'; }
+        if(s.players['2']) { document.getElementById('hud-p2-name').textContent=s.players['2'].username; document.getElementById('hud-p2-elo').textContent=s.players['2'].elo+' ELO'; }
     }
-    if (s.elapsed) document.getElementById('game-timer').textContent = fmt(s.elapsed);
+    if(s.elapsed) document.getElementById('game-timer').textContent=fmt(s.elapsed);
 }
 
 function showResult(result) {
-    if (typeof P2P !== 'undefined') P2P.close();
-    document.getElementById('result-overlay').style.display = 'flex';
-    var w = myNum === result.winner;
-    var my = myNum === 1 ? result.player1 : result.player2;
-    var tl = document.getElementById('result-title');
-    tl.textContent = w ? 'Победа!' : 'Поражение';
-    tl.style.color = w ? '#52b788' : '#e63946';
-    document.getElementById('result-score-p1').textContent = result.score[0];
-    document.getElementById('result-score-p2').textContent = result.score[1];
-    var el = document.getElementById('result-elo');
-    el.textContent = (my.elo_change >= 0 ? '+' : '') + my.elo_change + ' ELO';
-    el.style.color = my.elo_change >= 0 ? '#52b788' : '#e63946';
-    document.getElementById('result-coins').textContent = '+' + my.coins_earned + ' монет';
-    document.getElementById('result-rank').textContent = my.new_rank + ' (' + my.elo + ')';
+    if(typeof P2P!=='undefined') P2P.close();
+    document.getElementById('result-overlay').style.display='flex';
+    var w=myNum===result.winner;
+    var my=myNum===1?result.player1:result.player2;
+    var tl=document.getElementById('result-title');
+    tl.textContent=w?'Победа!':'Поражение';
+    tl.style.color=w?'#52b788':'#e63946';
+    document.getElementById('result-score-p1').textContent=result.score[0];
+    document.getElementById('result-score-p2').textContent=result.score[1];
+    var el=document.getElementById('result-elo');
+    el.textContent=(my.elo_change>=0?'+':'')+my.elo_change+' ELO';
+    el.style.color=my.elo_change>=0?'#52b788':'#e63946';
+    document.getElementById('result-coins').textContent='+'+my.coins_earned+' монет';
+    document.getElementById('result-rank').textContent=my.new_rank+' ('+my.elo+')';
 }
 
-// ═══ GAME LOOP ═══
+// ═══ GAME LOOP — 60fps ВСЕГДА ═══
 
-function gameLoop(timestamp) {
-    if (!lastFrameTime) lastFrameTime = timestamp;
-    lastFrameTime = timestamp;
-
+function gameLoop() {
     update();
     render();
     requestAnimationFrame(gameLoop);
@@ -385,51 +316,33 @@ function gameLoop(timestamp) {
 
 function update() {
     if (!gs) return;
-    var playing = (gs.state === 'playing');
+    var playing = (gs.state==='playing');
 
     if (playing) {
-        // ═══ МОЯ КЛЮШКА ═══
-        var mx = mouseX, my = mouseY;
-        if (myNum === 1) mx = clamp(mx, PR, FW/2-PR);
-        else mx = clamp(mx, FW/2+PR, FW-PR);
-        my = clamp(my, PR, FH-PR);
-        myX = mx; myY = my;
+        // Моя клюшка
+        var mx=mouseX, my=mouseY;
+        if (myNum===1) mx=clamp(mx,PR,FW/2-PR);
+        else mx=clamp(mx,FW/2+PR,FW-PR);
+        my=clamp(my,PR,FH-PR);
+        myX=mx; myY=my;
 
-        var now = performance.now();
-        if (now - lastSend > 16) {
-            lastSend = now;
-            if (sock && connected) {
-                sock.volatile.emit('paddle_move', {
-                    x: Math.round(mx*10)/10,
-                    y: Math.round(my*10)/10
-                });
-            }
-            if (p2pActive && typeof P2P !== 'undefined') {
-                P2P.send({t:'pos', x:Math.round(mx*10)/10, y:Math.round(my*10)/10});
-            }
+        var now=performance.now();
+        if (now-lastSend>16) {
+            lastSend=now;
+            if(sock&&connected) sock.volatile.emit('paddle_move',{x:Math.round(mx*10)/10,y:Math.round(my*10)/10});
+            if(p2pActive&&typeof P2P!=='undefined') P2P.send({t:'pos',x:Math.round(mx*10)/10,y:Math.round(my*10)/10});
         }
 
-        // ═══ ЛОКАЛЬНАЯ СИМУЛЯЦИЯ ШАЙБЫ ═══
-        // Клиент сам двигает шайбу по тем же правилам что сервер
-        // Это делает движение плавным даже при 250мс задержке
-        simulatePuckStep();
-
-        // Плавно корректируем к серверным данным
-        correctPuckToServer();
+        // ═══ КЛИЕНТ САМ ДВИГАЕТ ШАЙБУ 60fps ═══
+        simPuck();
     }
 
-    // Плавный рендер
-    drawPuck.x = lerp(drawPuck.x, puck.x, 0.7);
-    drawPuck.y = lerp(drawPuck.y, puck.y, 0.7);
-    drawEnemy.x = lerp(drawEnemy.x, enemyPad.x, p2pActive ? 0.7 : 0.4);
-    drawEnemy.y = lerp(drawEnemy.y, enemyPad.y, p2pActive ? 0.7 : 0.4);
-
-    trail.push({x: drawPuck.x, y: drawPuck.y});
-    if (trail.length > TRAIL_MAX) trail.shift();
-    if (goalFlash > 0) goalFlash--;
+    trail.push({x:puck.x, y:puck.y});
+    if(trail.length>TRAIL_MAX) trail.shift();
+    if(goalFlash>0) goalFlash--;
 }
 
-// ═══ RENDER ═══
+// ═══ RENDER — рисуем puck напрямую, без доп. интерполяции ═══
 
 function render() {
     if (!gs) return;
@@ -473,21 +386,23 @@ function render() {
         ctx.fillStyle='rgba(26,26,46,'+ta+')';ctx.fill();
     }
 
-    var px=drawPuck.x*sx,py=drawPuck.y*sy,pr=PKR*s;
+    // Шайба — рисуем puck напрямую
+    var px=puck.x*sx, py=puck.y*sy, pr=PKR*s;
     ctx.beginPath();ctx.arc(px+2,py+3,pr,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fill();
     ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.fillStyle='#1a1a2e';ctx.fill();
     ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.stroke();
     ctx.beginPath();ctx.arc(px-pr*.25,py-pr*.25,pr*.3,0,Math.PI*2);
     ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fill();
 
-    var myN=String(myNum),enN=myNum===1?'2':'1';
-    drawPad(drawEnemy.x*sx,drawEnemy.y*sy,PR*s,enN,false,s);
-    drawPad(myX*sx,myY*sy,PR*s,myN,true,s);
+    // Клюшки
+    var myN=String(myNum), enN=myNum===1?'2':'1';
+    drawPad(enemyPad.x*sx, enemyPad.y*sy, PR*s, enN, false, s);
+    drawPad(myX*sx, myY*sy, PR*s, myN, true, s);
 
-    ctx.fillStyle = p2pActive ? '#52b788' : '#e6b800';
+    ctx.fillStyle=p2pActive?'#52b788':'#e6b800';
     ctx.beginPath();ctx.arc(W-20,20,6,0,Math.PI*2);ctx.fill();
     ctx.font='bold 10px Nunito,sans-serif';ctx.textAlign='right';
-    ctx.fillText(p2pActive ? 'P2P' : 'WS', W-30, 24);
+    ctx.fillText(p2pActive?'P2P':'WS',W-30,24);
 }
 
 function rRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.arcTo(x+w,y,x+w,y+r,r);c.lineTo(x+w,y+h-r);c.arcTo(x+w,y+h,x+w-r,y+h,r);c.lineTo(x+r,y+h);c.arcTo(x,y+h,x,y+h-r,r);c.lineTo(x,y+r);c.arcTo(x,y,x+r,y,r);c.closePath();}
