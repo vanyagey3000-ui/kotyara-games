@@ -71,5 +71,6 @@
     const SKIN_IMAGES = {{ skin_images | tojson }};
     const BG_IMAGE_URL = {{ (bg_url or 'null') | tojson }};
 </script>
+<script src="{{ url_for('static', filename='js/p2p.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 {% endblock %}

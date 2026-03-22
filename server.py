@@ -556,6 +556,21 @@ def _handle_game_end(room, forfeit_player=None):
     }
     socketio.emit('game_finished', result, to=room.room_id)
 
+# ═══ P2P Signaling ═══
+
+@socketio.on('p2p_signal')
+def handle_p2p_signal(data):
+    """Просто пересылаем сигнал другому игроку в комнате"""
+    if not current_user.is_authenticated:
+        return
+    room_id = data.get('room_id')
+    if not room_id:
+        return
+    # Отправляем всем В КОМНАТЕ кроме отправителя
+    emit('p2p_signal', {
+        'type': data.get('type'),
+        'data': data.get('data')
+    }, to=room_id, include_self=False)
 
 def game_loop():
     with app.app_context():

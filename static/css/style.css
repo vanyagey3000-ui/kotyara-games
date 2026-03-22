@@ -1226,3 +1226,44 @@ a:hover { color: var(--red); }
 .chat-input-form input:focus {
     border-color: var(--blue);
 }
+
+/* ─── Настройки подключения ───────────────────────────── */
+
+.connection-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.conn-option {
+    cursor: pointer;
+}
+
+.conn-option input {
+    display: none;
+}
+
+.conn-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--ice);
+    border: 3px solid var(--ice-dark);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.conn-option input:checked + .conn-card {
+    border-color: var(--blue);
+    background: var(--blue-light);
+    box-shadow: 0 0 0 2px var(--blue);
+}
+
+.conn-card:hover {
+    border-color: var(--blue);
+}
+
+.conn-icon {
+    font-size: 28px;
+}

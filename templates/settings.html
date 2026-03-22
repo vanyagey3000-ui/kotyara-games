@@ -9,7 +9,37 @@
             <h1>Настройки</h1>
         </div>
 
-        <h3 style="margin-bottom:12px;font-weight:800">Изменить никнейм</h3>
+        <!-- Тип подключения -->
+        <h3 style="margin-bottom:12px;font-weight:800">🌐 Тип подключения</h3>
+        <div class="connection-selector" style="margin-bottom:28px">
+            <label class="conn-option" id="opt-p2p">
+                <input type="radio" name="conn_type" value="p2p"
+                    onchange="setConnType('p2p')"
+                    id="radio-p2p">
+                <div class="conn-card">
+                    <span class="conn-icon">🚀</span>
+                    <div>
+                        <strong>P2P (рекомендуется)</strong>
+                        <p style="font-size:12px;color:var(--dark-soft);margin:2px 0 0">Прямое соединение — минимальный пинг</p>
+                    </div>
+                </div>
+            </label>
+            <label class="conn-option" id="opt-ws">
+                <input type="radio" name="conn_type" value="websocket"
+                    onchange="setConnType('websocket')"
+                    id="radio-ws">
+                <div class="conn-card">
+                    <span class="conn-icon">🌐</span>
+                    <div>
+                        <strong>WebSocket (через сервер)</strong>
+                        <p style="font-size:12px;color:var(--dark-soft);margin:2px 0 0">Стабильно, но зависит от сервера</p>
+                    </div>
+                </div>
+            </label>
+        </div>
+
+        <!-- Смена ника -->
+        <h3 style="margin-bottom:12px;font-weight:800">✏️ Изменить никнейм</h3>
         <form method="POST" class="auth-form" style="margin-bottom:28px">
             <input type="hidden" name="action" value="change_username">
             <div class="form-group">
@@ -19,7 +49,8 @@
             <button type="submit" class="btn btn-blue btn-full">Сменить никнейм</button>
         </form>
 
-        <h3 style="margin-bottom:12px;font-weight:800">Изменить пароль</h3>
+        <!-- Смена пароля -->
+        <h3 style="margin-bottom:12px;font-weight:800">🔒 Изменить пароль</h3>
         <form method="POST" class="auth-form">
             <input type="hidden" name="action" value="change_password">
             <div class="form-group">
@@ -38,4 +69,17 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setConnType(type) {
+    localStorage.setItem('conn_type', type);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var saved = localStorage.getItem('conn_type') || 'p2p';
+    document.getElementById('radio-' + (saved === 'p2p' ? 'p2p' : 'ws')).checked = true;
+});
+</script>
 {% endblock %}

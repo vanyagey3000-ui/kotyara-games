@@ -9,14 +9,12 @@ var sock = null;
 var FW = 800, FH = 500, PR = 30, PKR = 15;
 var GW = 140, GY1 = (FH - GW) / 2, GY2 = (FH + GW) / 2;
 
-// Positions
 var myX = 80, myY = FH / 2;
 var mouseX = 400, mouseY = 250;
 var lastSend = 0;
 
-// Server data with interpolation
-var srvPuck = {x: FW/2, y: FH/2, px: FW/2, py: FH/2};
-var srvEnemy = {x: FW-80, y: FH-80, px: FW-80, py: FH/2};
+var srvPuck = {x: FW/2, y: FH/2};
+var srvEnemy = {x: FW-80, y: FH/2};
 var drawPuck = {x: FW/2, y: FH/2};
 var drawEnemy = {x: FW-80, y: FH/2};
 
@@ -25,7 +23,11 @@ var goalFlash = 0;
 var trail = [];
 var TRAIL_MAX = 16;
 
-// Images
+// Connection mode
+var connMode = localStorage.getItem('conn_type') || 'p2p';
+var p2pActive = false;
+var p2pReady = false;
+
 var imgs = {};
 var bgImg = null;
 
@@ -66,21 +68,15 @@ function initCanvas() {
     canvas.height = c.clientHeight - (h ? h.offsetHeight : 50);
 }
 window.addEventListener('resize', initCanvas);
-window.addEventListener('orientationchange', function() {
-    setTimeout(initCanvas, 200);
-});
+window.addEventListener('orientationchange', function() { setTimeout(initCanvas, 200); });
 initCanvas();
 
-function fmt(s) {
-    var m = Math.floor(s/60);
-    var sec = Math.floor(s%60);
-    return m + ':' + (sec < 10 ? '0' : '') + sec;
-}
+function fmt(s) { var m=Math.floor(s/60),sec=Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+function clamp(v,a,b) { return v<a?a:v>b?b:v; }
+function lerp(a,b,t) { return a+(b-a)*t; }
 
-function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
-function lerp(a, b, t) { return a + (b - a) * t; }
+// === SOCKET + P2P INIT ===
 
-// Socket
 function initGame() {
     sock = io({transports: ['websocket', 'polling'], reconnection: true});
 
@@ -96,42 +92,56 @@ function initGame() {
         connected = true;
         document.getElementById('waiting-overlay').style.display = 'none';
         sync(d.state);
+
+        // Попробовать P2P если выбрано
+        if (connMode === 'p2p' && typeof P2P !== 'undefined') {
+            console.log('Trying P2P...');
+            var isHost = (myNum === 1);
+            P2P.onConnect = function() {
+                p2pActive = true;
+                p2pReady = true;
+                console.log('P2P CONNECTED! Direct data channel active.');
+                toast('P2P подключён! Минимальный пинг.');
+            };
+            P2P.onDisconnect = function() {
+                p2pActive = false;
+                console.log('P2P disconnected, fallback to WebSocket');
+            };
+            P2P.onMessage = function(msg) {
+                handleP2PMessage(msg);
+            };
+            P2P.init(sock, ROOM_ID, isHost);
+        }
     });
 
+    // WebSocket game state (fallback или основной)
     sock.on('game_state', function(state) {
         gs = state;
 
-        if (state.puck) {
-            srvPuck.px = srvPuck.x;
-            srvPuck.py = srvPuck.y;
-            srvPuck.x = state.puck.x;
-            srvPuck.y = state.puck.y;
-        }
-
-        var en = myNum === 1 ? '2' : '1';
-        if (state.paddles && state.paddles[en]) {
-            srvEnemy.px = srvEnemy.x;
-            srvEnemy.py = srvEnemy.y;
-            srvEnemy.x = state.paddles[en].x;
-            srvEnemy.y = state.paddles[en].y;
-        }
-
-        if (state.score) {
-            if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
-                goalFlash = 25;
-                trail = [];
-            }
-            score = [state.score[0], state.score[1]];
-        }
-
-        updateHUD(state);
-
-        if (state.state === 'countdown') {
-            document.getElementById('countdown-overlay').style.display = 'flex';
-            document.getElementById('countdown-num').textContent = state.countdown || '...';
-            sync(state);
+        // Если P2P активен — игнорируем серверные данные для противника
+        // (получаем напрямую через P2P)
+        if (!p2pActive) {
+            applyServerState(state);
         } else {
-            document.getElementById('countdown-overlay').style.display = 'none';
+            // Только счёт и состояние от сервера
+            if (state.score) {
+                if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
+                    goalFlash = 25; trail = [];
+                }
+                score = [state.score[0], state.score[1]];
+            }
+            if (state.puck) {
+                srvPuck.x = state.puck.x;
+                srvPuck.y = state.puck.y;
+            }
+            updateHUD(state);
+            if (state.state === 'countdown') {
+                document.getElementById('countdown-overlay').style.display = 'flex';
+                document.getElementById('countdown-num').textContent = state.countdown || '...';
+                sync(state);
+            } else {
+                document.getElementById('countdown-overlay').style.display = 'none';
+            }
         }
     });
 
@@ -152,68 +162,91 @@ function initGame() {
     }, 10000);
 }
 
+function handleP2PMessage(msg) {
+    // Получили позицию противника напрямую через P2P
+    if (msg.t === 'pos') {
+        srvEnemy.x = msg.x;
+        srvEnemy.y = msg.y;
+    }
+}
+
+function applyServerState(state) {
+    if (!state) return;
+    var en = myNum === 1 ? '2' : '1';
+
+    if (state.puck) {
+        srvPuck.x = state.puck.x;
+        srvPuck.y = state.puck.y;
+    }
+    if (state.paddles && state.paddles[en]) {
+        srvEnemy.x = state.paddles[en].x;
+        srvEnemy.y = state.paddles[en].y;
+    }
+    if (state.score) {
+        if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
+            goalFlash = 25; trail = [];
+        }
+        score = [state.score[0], state.score[1]];
+    }
+    updateHUD(state);
+
+    if (state.state === 'countdown') {
+        document.getElementById('countdown-overlay').style.display = 'flex';
+        document.getElementById('countdown-num').textContent = state.countdown || '...';
+        sync(state);
+    } else {
+        document.getElementById('countdown-overlay').style.display = 'none';
+    }
+}
+
 function sync(state) {
     if (!state) return;
     var my = String(myNum), en = myNum === 1 ? '2' : '1';
     if (state.paddles && state.paddles[my]) {
-        myX = state.paddles[my].x;
-        myY = state.paddles[my].y;
+        myX = state.paddles[my].x; myY = state.paddles[my].y;
         mouseX = myX; mouseY = myY;
     }
     if (state.paddles && state.paddles[en]) {
-        srvEnemy.x = srvEnemy.px = drawEnemy.x = state.paddles[en].x;
-        srvEnemy.y = srvEnemy.py = drawEnemy.y = state.paddles[en].y;
+        srvEnemy.x = drawEnemy.x = state.paddles[en].x;
+        srvEnemy.y = drawEnemy.y = state.paddles[en].y;
     }
     if (state.puck) {
-        srvPuck.x = srvPuck.px = drawPuck.x = state.puck.x;
-        srvPuck.y = srvPuck.py = drawPuck.y = state.puck.y;
+        srvPuck.x = drawPuck.x = state.puck.x;
+        srvPuck.y = drawPuck.y = state.puck.y;
     }
     if (state.score) score = [state.score[0], state.score[1]];
     trail = [];
 }
 
-// Input — mouse + touch unified
-function getGamePos(clientX, clientY) {
+// === INPUT ===
+
+function getGamePos(cx, cy) {
     var r = canvas.getBoundingClientRect();
-    return {
-        x: (clientX - r.left) * (FW / canvas.width),
-        y: (clientY - r.top) * (FH / canvas.height)
-    };
+    return { x: (cx-r.left)*(FW/canvas.width), y: (cy-r.top)*(FH/canvas.height) };
 }
 
 canvas.addEventListener('mousemove', function(e) {
-    var p = getGamePos(e.clientX, e.clientY);
-    mouseX = p.x; mouseY = p.y;
+    var p = getGamePos(e.clientX, e.clientY); mouseX = p.x; mouseY = p.y;
 });
-
 canvas.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    var t = e.touches[0];
-    var p = getGamePos(t.clientX, t.clientY);
-    mouseX = p.x; mouseY = p.y;
-}, {passive: false});
-
+    e.preventDefault(); var t=e.touches[0]; var p=getGamePos(t.clientX,t.clientY); mouseX=p.x; mouseY=p.y;
+}, {passive:false});
 canvas.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    var t = e.touches[0];
-    var p = getGamePos(t.clientX, t.clientY);
-    mouseX = p.x; mouseY = p.y;
-}, {passive: false});
-
-// Prevent scroll/zoom on mobile during game
+    e.preventDefault(); var t=e.touches[0]; var p=getGamePos(t.clientX,t.clientY); mouseX=p.x; mouseY=p.y;
+}, {passive:false});
 document.addEventListener('touchmove', function(e) {
     if (document.getElementById('game-canvas')) e.preventDefault();
-}, {passive: false});
+}, {passive:false});
 
 function toast(msg) {
     var old = document.getElementById('game-toast');
     if (old) old.remove();
     var t = document.createElement('div');
     t.id = 'game-toast';
-    t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#e63946;padding:12px 24px;border-radius:12px;font-weight:700;z-index:9999;font-family:Nunito,sans-serif;border:3px solid #1a1a2e';
+    t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.95);color:#1a1a2e;padding:12px 24px;border-radius:12px;font-weight:700;z-index:9999;font-family:Nunito,sans-serif;border:3px solid #1a1a2e;box-shadow:0 4px 0 rgba(0,0,0,0.2)';
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(function() { if (t.parentNode) t.remove(); }, 4000);
+    setTimeout(function() { if (t.parentNode) t.remove(); }, 3000);
 }
 
 function updateHUD(s) {
@@ -234,6 +267,7 @@ function updateHUD(s) {
 }
 
 function showResult(result) {
+    if (typeof P2P !== 'undefined') P2P.close();
     document.getElementById('result-overlay').style.display = 'flex';
     var w = myNum === result.winner;
     var my = myNum === 1 ? result.player1 : result.player2;
@@ -262,25 +296,34 @@ function update() {
 
     if (gs.state === 'playing') {
         var mx = mouseX, my = mouseY;
-        if (myNum === 1) mx = clamp(mx, PR, FW/2 - PR);
-        else mx = clamp(mx, FW/2 + PR, FW - PR);
-        my = clamp(my, PR, FH - PR);
+        if (myNum === 1) mx = clamp(mx, PR, FW/2-PR);
+        else mx = clamp(mx, FW/2+PR, FW-PR);
+        my = clamp(my, PR, FH-PR);
 
-        myX = mx;
-        myY = my;
+        myX = mx; myY = my;
 
         var now = performance.now();
-        if (now - lastSend > 16 && sock && connected) {
+        if (now - lastSend > 16) {
             lastSend = now;
-            sock.volatile.emit('paddle_move', {
-                x: Math.round(mx * 10) / 10,
-                y: Math.round(my * 10) / 10
-            });
+            var posData = {
+                x: Math.round(mx*10)/10,
+                y: Math.round(my*10)/10
+            };
+
+            // Отправляем серверу (для физики шайбы)
+            if (sock && connected) {
+                sock.volatile.emit('paddle_move', posData);
+            }
+
+            // Отправляем напрямую противнику через P2P
+            if (p2pActive && typeof P2P !== 'undefined') {
+                P2P.send({t: 'pos', x: posData.x, y: posData.y});
+            }
         }
     }
 
-    // Interpolate puck and enemy smoothly
-    var t = 0.4;
+    // Интерполяция — P2P быстрее поэтому lerp быстрее
+    var t = p2pActive ? 0.6 : 0.4;
     drawPuck.x = lerp(drawPuck.x, srvPuck.x, t);
     drawPuck.y = lerp(drawPuck.y, srvPuck.y, t);
     drawEnemy.x = lerp(drawEnemy.x, srvEnemy.x, t);
@@ -288,172 +331,121 @@ function update() {
 
     trail.push({x: drawPuck.x, y: drawPuck.y});
     if (trail.length > TRAIL_MAX) trail.shift();
-
     if (goalFlash > 0) goalFlash--;
 }
 
-// === RENDER ===
+// === RENDER (same as before) ===
 
 function render() {
     if (!gs) return;
-    var W = canvas.width, H = canvas.height;
-    var sx = W/FW, sy = H/FH, s = Math.min(sx, sy);
+    var W=canvas.width, H=canvas.height, sx=W/FW, sy=H/FH, s=Math.min(sx,sy);
 
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#e8f4f8'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(162,210,255,0.35)';
+    var sw=W/8; for(var i=0;i<8;i+=2) ctx.fillRect(i*sw,0,sw,H);
+    if(bgImg){ctx.globalAlpha=0.3;ctx.drawImage(bgImg,0,0,W,H);ctx.globalAlpha=1;}
 
-    // Ice background
-    ctx.fillStyle = '#e8f4f8';
-    ctx.fillRect(0, 0, W, H);
+    var bw=8*s,cr=30*s;
+    ctx.strokeStyle='#3a7bd5';ctx.lineWidth=bw;
+    rRect(ctx,bw/2,bw/2,W-bw,H-bw,cr);ctx.stroke();
+    ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2;
+    rRect(ctx,bw/2,bw/2,W-bw,H-bw,cr);ctx.stroke();
 
-    // Stripes
-    ctx.fillStyle = 'rgba(162,210,255,0.35)';
-    var sw = W / 8;
-    for (var i = 0; i < 8; i += 2) ctx.fillRect(i * sw, 0, sw, H);
+    ctx.strokeStyle='#4895ef';ctx.lineWidth=3*s;
+    ctx.beginPath();ctx.moveTo(W/2,bw);ctx.lineTo(W/2,H-bw);ctx.stroke();
+    ctx.beginPath();ctx.arc(W/2,H/2,50*s,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.arc(W/2,H/2,5*s,0,Math.PI*2);ctx.fillStyle='#4895ef';ctx.fill();
 
-    if (bgImg) { ctx.globalAlpha = 0.3; ctx.drawImage(bgImg, 0, 0, W, H); ctx.globalAlpha = 1; }
+    var gy1=GY1*sy,gy2=GY2*sy,gw=14*sx;
+    drawGoal(0,gy1,gw,gy2-gy1,'#e63946',s);
+    drawGoal(W-gw,gy1,gw,gy2-gy1,'#4895ef',s);
 
-    // Border
-    var bw = 8 * s, cr = 30 * s;
-    ctx.strokeStyle = '#3a7bd5'; ctx.lineWidth = bw;
-    rRect(ctx, bw/2, bw/2, W-bw, H-bw, cr); ctx.stroke();
-    ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 2;
-    rRect(ctx, bw/2, bw/2, W-bw, H-bw, cr); ctx.stroke();
-
-    // Center line
-    ctx.strokeStyle = '#4895ef'; ctx.lineWidth = 3*s;
-    ctx.beginPath(); ctx.moveTo(W/2, bw); ctx.lineTo(W/2, H-bw); ctx.stroke();
-
-    // Center circle + dot
-    ctx.beginPath(); ctx.arc(W/2, H/2, 50*s, 0, Math.PI*2);
-    ctx.strokeStyle = '#4895ef'; ctx.lineWidth = 3*s; ctx.stroke();
-    ctx.beginPath(); ctx.arc(W/2, H/2, 5*s, 0, Math.PI*2);
-    ctx.fillStyle = '#4895ef'; ctx.fill();
-
-    // Goals
-    var gy1 = GY1*sy, gy2 = GY2*sy, gw = 14*sx;
-    drawGoal(0, gy1, gw, gy2-gy1, '#e63946', s);
-    drawGoal(W-gw, gy1, gw, gy2-gy1, '#4895ef', s);
-
-    // Faceoff circles
-    var fo = [[FW*.2,FH*.3],[FW*.2,FH*.7],[FW*.8,FH*.3],[FW*.8,FH*.7]];
-    for (var fi = 0; fi < fo.length; fi++) {
-        var fx = fo[fi][0]*sx, fy = fo[fi][1]*sy, fr = 18*s;
-        ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI*2);
-        ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2*s; ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(fx-fr*.5, fy-fr*.5); ctx.lineTo(fx+fr*.5, fy+fr*.5);
-        ctx.moveTo(fx+fr*.5, fy-fr*.5); ctx.lineTo(fx-fr*.5, fy+fr*.5);
-        ctx.stroke();
+    var fo=[[FW*.2,FH*.3],[FW*.2,FH*.7],[FW*.8,FH*.3],[FW*.8,FH*.7]];
+    for(var fi=0;fi<fo.length;fi++){
+        var fx=fo[fi][0]*sx,fy=fo[fi][1]*sy,fr=18*s;
+        ctx.beginPath();ctx.arc(fx,fy,fr,0,Math.PI*2);
+        ctx.strokeStyle='#e63946';ctx.lineWidth=2*s;ctx.stroke();
+        ctx.beginPath();ctx.moveTo(fx-fr*.5,fy-fr*.5);ctx.lineTo(fx+fr*.5,fy+fr*.5);
+        ctx.moveTo(fx+fr*.5,fy-fr*.5);ctx.lineTo(fx-fr*.5,fy+fr*.5);ctx.stroke();
     }
 
-    // Goal flash
-    if (goalFlash > 0) {
-        ctx.fillStyle = 'rgba(255,255,255,' + (goalFlash/40) + ')';
-        ctx.fillRect(0, 0, W, H);
+    if(goalFlash>0){ctx.fillStyle='rgba(255,255,255,'+(goalFlash/40)+')';ctx.fillRect(0,0,W,H);}
+
+    for(var ti=1;ti<trail.length;ti++){
+        var ta=(ti/trail.length)*0.2,tr=(ti/trail.length)*PKR*s*0.5;
+        ctx.beginPath();ctx.arc(trail[ti].x*sx,trail[ti].y*sy,tr,0,Math.PI*2);
+        ctx.fillStyle='rgba(26,26,46,'+ta+')';ctx.fill();
     }
 
-    // Trail
-    for (var ti = 1; ti < trail.length; ti++) {
-        var ta = (ti/trail.length) * 0.2;
-        var tr = (ti/trail.length) * PKR * s * 0.5;
-        ctx.beginPath(); ctx.arc(trail[ti].x*sx, trail[ti].y*sy, tr, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(26,26,46,' + ta + ')'; ctx.fill();
-    }
+    var px=drawPuck.x*sx,py=drawPuck.y*sy,pr=PKR*s;
+    ctx.beginPath();ctx.arc(px+2,py+3,pr,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fill();
+    ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.fillStyle='#1a1a2e';ctx.fill();
+    ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.stroke();
+    ctx.beginPath();ctx.arc(px-pr*.25,py-pr*.25,pr*.3,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fill();
 
-    // Puck
-    var px = drawPuck.x*sx, py = drawPuck.y*sy, pr = PKR*s;
-    ctx.beginPath(); ctx.arc(px+2, py+3, pr, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI*2);
-    ctx.fillStyle = '#1a1a2e'; ctx.fill();
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(px-pr*.25, py-pr*.25, pr*.3, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fill();
+    var myN=String(myNum),enN=myNum===1?'2':'1';
+    drawPad(drawEnemy.x*sx,drawEnemy.y*sy,PR*s,enN,false,s);
+    drawPad(myX*sx,myY*sy,PR*s,myN,true,s);
 
-    // Paddles
-    var myN = String(myNum), enN = myNum===1?'2':'1';
-    drawPad(drawEnemy.x*sx, drawEnemy.y*sy, PR*s, enN, false, s);
-    drawPad(myX*sx, myY*sy, PR*s, myN, true, s);
-}
-
-function rRect(c, x, y, w, h, r) {
-    c.beginPath();
-    c.moveTo(x+r, y); c.lineTo(x+w-r, y);
-    c.arcTo(x+w, y, x+w, y+r, r); c.lineTo(x+w, y+h-r);
-    c.arcTo(x+w, y+h, x+w-r, y+h, r); c.lineTo(x+r, y+h);
-    c.arcTo(x, y+h, x, y+h-r, r); c.lineTo(x, y+r);
-    c.arcTo(x, y, x+r, y, r); c.closePath();
-}
-
-function drawGoal(x, y, w, h, color, s) {
-    ctx.fillStyle = color + '40'; ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = color; ctx.lineWidth = 1.5;
-    var step = 8*s;
-    for (var gy = y; gy < y+h; gy += step) {
-        ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x+w, gy); ctx.stroke();
-    }
-    for (var gx = x; gx < x+w; gx += step) {
-        ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y+h); ctx.stroke();
-    }
-    ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
-}
-
-function drawPad(x, y, r, numStr, isMe, s) {
-    var sk = 'kompot';
-    if (gs.players && gs.players[numStr]) sk = gs.players[numStr].skin || 'kompot';
-    var skin = SK[sk] || SK.kompot;
-    var tc = numStr === '1' ? '#e63946' : '#4895ef';
-
-    ctx.beginPath(); ctx.arc(x+2, y+4, r+2, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fill();
-
-    ctx.beginPath(); ctx.arc(x, y, r+4*s, 0, Math.PI*2);
-    ctx.fillStyle = tc; ctx.fill();
-    ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 3; ctx.stroke();
-
-    var img = imgs[sk + '_paddle'];
-    if (img) {
-        ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.clip();
-        ctx.drawImage(img, x-r, y-r, r*2, r*2); ctx.restore();
-    } else {
-        var g = ctx.createRadialGradient(x-r*.2, y-r*.2, 0, x, y, r);
-        g.addColorStop(0, skin.p); g.addColorStop(1, skin.s);
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
-        ctx.fillStyle = g; ctx.fill();
-        ctx.font = Math.round(r*1.1) + 'px sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(skin.f, x, y);
-    }
-
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 2.5; ctx.stroke();
-
-    if (gs.players && gs.players[numStr]) {
-        var name = gs.players[numStr].username;
-        var fs = Math.max(10, Math.round(12*s));
-        ctx.font = 'bold ' + fs + 'px Nunito,sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        var tw = ctx.measureText(name).width;
-        var lh = Math.round(16*s);
-        var ly = y + r + Math.round(6*s);
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.fillRect(x-tw/2-4, ly, tw+8, lh);
-        ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 1.5;
-        ctx.strokeRect(x-tw/2-4, ly, tw+8, lh);
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillText(name, x, ly + lh/2);
-    }
-
-    if (isMe) {
-        var mfs = Math.max(9, Math.round(10*s));
-        ctx.font = 'bold ' + mfs + 'px Nunito,sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        var meY = y - r - Math.round(12*s);
-        ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 2;
-        ctx.strokeText('\u25BC YOU', x, meY);
+    // P2P indicator
+    if (p2pActive) {
         ctx.fillStyle = '#52b788';
-        ctx.fillText('\u25BC YOU', x, meY);
+        ctx.beginPath(); ctx.arc(W-20,20,6,0,Math.PI*2); ctx.fill();
+        ctx.font = 'bold 10px Nunito,sans-serif';
+        ctx.fillStyle = '#52b788';
+        ctx.textAlign = 'right';
+        ctx.fillText('P2P', W-30, 24);
     }
+}
+
+function rRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.arcTo(x+w,y,x+w,y+r,r);c.lineTo(x+w,y+h-r);c.arcTo(x+w,y+h,x+w-r,y+h,r);c.lineTo(x+r,y+h);c.arcTo(x,y+h,x,y+h-r,r);c.lineTo(x,y+r);c.arcTo(x,y,x+r,y,r);c.closePath();}
+
+function drawGoal(x,y,w,h,color,s){
+    ctx.fillStyle=color+'40';ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle=color;ctx.lineWidth=1.5;
+    var step=8*s;
+    for(var gy=y;gy<y+h;gy+=step){ctx.beginPath();ctx.moveTo(x,gy);ctx.lineTo(x+w,gy);ctx.stroke();}
+    for(var gx=x;gx<x+w;gx+=step){ctx.beginPath();ctx.moveTo(gx,y);ctx.lineTo(gx,y+h);ctx.stroke();}
+    ctx.strokeStyle='#1a1a2e';ctx.lineWidth=3;ctx.strokeRect(x,y,w,h);
+}
+
+function drawPad(x,y,r,numStr,isMe,s){
+    var sk='kompot';
+    if(gs.players&&gs.players[numStr])sk=gs.players[numStr].skin||'kompot';
+    var skin=SK[sk]||SK.kompot;
+    var tc=numStr==='1'?'#e63946':'#4895ef';
+
+    ctx.beginPath();ctx.arc(x+2,y+4,r+2,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fill();
+    ctx.beginPath();ctx.arc(x,y,r+4*s,0,Math.PI*2);ctx.fillStyle=tc;ctx.fill();
+    ctx.strokeStyle='#1a1a2e';ctx.lineWidth=3;ctx.stroke();
+
+    var img=imgs[sk+'_paddle'];
+    if(img){ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();
+        ctx.drawImage(img,x-r,y-r,r*2,r*2);ctx.restore();}
+    else{var g=ctx.createRadialGradient(x-r*.2,y-r*.2,0,x,y,r);
+        g.addColorStop(0,skin.p);g.addColorStop(1,skin.s);
+        ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+        ctx.font=Math.round(r*1.1)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(skin.f,x,y);}
+
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2.5;ctx.stroke();
+
+    if(gs.players&&gs.players[numStr]){
+        var name=gs.players[numStr].username;
+        var fs=Math.max(10,Math.round(12*s));
+        ctx.font='bold '+fs+'px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        var tw=ctx.measureText(name).width;
+        var lh=Math.round(16*s),ly=y+r+Math.round(6*s);
+        ctx.fillStyle='rgba(255,255,255,0.85)';ctx.fillRect(x-tw/2-4,ly,tw+8,lh);
+        ctx.strokeStyle='#1a1a2e';ctx.lineWidth=1.5;ctx.strokeRect(x-tw/2-4,ly,tw+8,lh);
+        ctx.fillStyle='#1a1a2e';ctx.fillText(name,x,ly+lh/2);
+    }
+    if(isMe){var mfs=Math.max(9,Math.round(10*s));
+        ctx.font='bold '+mfs+'px Nunito,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        var meY=y-r-Math.round(12*s);ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2;
+        ctx.strokeText('\u25BC YOU',x,meY);ctx.fillStyle='#52b788';ctx.fillText('\u25BC YOU',x,meY);}
 }
 
 document.addEventListener('DOMContentLoaded', function() {
