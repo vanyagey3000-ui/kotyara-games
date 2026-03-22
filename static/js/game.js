@@ -14,7 +14,6 @@ var trail = [], TRAIL_MAX = 16;
 var p2pActive = false, isHost = false;
 var prevState = 'waiting';
 
-<<<<<<< HEAD
 var puck = {x: FW/2, y: FH/2, vx: 0, vy: 0};
 var serverPuck = {x: FW/2, y: FH/2, vx: 0, vy: 0, receivedAt: 0, packetGap: 16};
 var enemyPad = {x: FW-80, y: FH/2};
