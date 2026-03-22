@@ -608,11 +608,8 @@ def game_loop():
             finished = []
             for rid, room in list(game_rooms.items()):
                 if room.state in ('playing', 'countdown'):
-                    # Если P2P активен — сервер НЕ считает физику,
-                    # только шлёт минимальный state для HUD/таймера
                     if getattr(room, 'p2p_active', False) and room.state == 'playing':
-                        # Шлём только метаданные (таймер, состояние, счёт)
-                        state = room.get_state()  # без обновления физики
+                        state = room.get_state()
                         socketio.emit('game_state', state, to=rid)
                     else:
                         state = room.update()
@@ -628,6 +625,21 @@ def game_loop():
                         print('end err:', e)
                         import traceback; traceback.print_exc()
             eventlet.sleep(1 / 60)
+
+
+# ← Добавьте эту функцию сразу после game_loop
+def cleanup_loop():
+    """Очистка завершённых комнат и зависших переходов"""
+    with app.app_context():
+        while True:
+            to_del = []
+            for rid, room in list(game_rooms.items()):
+                if room.state == 'finished' and (time.time() - room.last_update > 60):
+                    to_del.append(rid)
+            for rid in to_del:
+                game_rooms.pop(rid, None)
+            users_transitioning.clear()
+            eventlet.sleep(30)
 
 
 def create_app():
