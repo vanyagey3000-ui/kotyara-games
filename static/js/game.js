@@ -213,7 +213,7 @@ function initGame() {
     sock.on('game_state', function(state) {
         gs = state;
 
-        // Обновляем countdown всегда от сервера
+        // Countdown всегда от сервера
         if (state.state === 'countdown') {
             document.getElementById('countdown-overlay').style.display = 'flex';
             document.getElementById('countdown-num').textContent = state.countdown || '...';
@@ -243,7 +243,7 @@ function initGame() {
                 score = [state.score[0], state.score[1]];
             }
         } else {
-            // ═══ P2P РЕЖИМ: от сервера берём только подтверждение счёта ═══
+            // ═══ P2P РЕЖИМ: от сервера только счёт и таймер ═══
             if (state.score) {
                 score = [state.score[0], state.score[1]];
             }
@@ -271,30 +271,31 @@ function initGame() {
 
 function onP2PMsg(msg) {
     if (msg.t === 'pos') {
-        // Позиция клюшки противника
         enemyPad.x = msg.x;
         enemyPad.y = msg.y;
     }
     if (msg.t === 'puck' && physicsAuthority === 'p2p_guest') {
-        // Гость получает шайбу ТОЛЬКО от хоста
+        // Гость применяет позицию шайбы от хоста напрямую
         puck.x = msg.x;
         puck.y = msg.y;
         puck.vx = msg.vx;
         puck.vy = msg.vy;
+        // Также обновляем draw позицию чтобы не было рывков
+        drawPuck.x = lerp(drawPuck.x, msg.x, 0.8);
+        drawPuck.y = lerp(drawPuck.y, msg.y, 0.8);
     }
     if (msg.t === 'goal') {
-        // Хост сообщает о голе
         score = [msg.s0, msg.s1];
         goalFlash = 25;
         trail = [];
         updateHUDScore();
     }
     if (msg.t === 'reset') {
-        // Хост сбросил шайбу после гола
-        puck.x = msg.x;
-        puck.y = msg.y;
+        puck.x = drawPuck.x = msg.x;
+        puck.y = drawPuck.y = msg.y;
         puck.vx = msg.vx;
         puck.vy = msg.vy;
+        trail = [];
     }
 }
 

@@ -608,11 +608,26 @@ def game_loop():
             finished = []
             for rid, room in list(game_rooms.items()):
                 if room.state in ('playing', 'countdown'):
+                    # Всегда вызываем update — он считает физику
+                    # P2P хост сам шлёт позицию шайбы клиентам,
+                    # но сервер всё равно считает для валидации и fallback
+                    state = room.update()
+                    
                     if getattr(room, 'p2p_active', False) and room.state == 'playing':
-                        state = room.get_state()
-                        socketio.emit('game_state', state, to=rid)
+                        # P2P активен — шлём только метаданные (счёт, таймер)
+                        # Шайбу и клюшки P2P хост шлёт напрямую
+                        lite_state = {
+                            'room_id': room.room_id,
+                            'state': room.state,
+                            'score': room.score,
+                            'countdown': room.countdown,
+                            'players': state.get('players', {}),
+                            'elapsed': state.get('elapsed', 0),
+                            'max_score': room.MAX_SCORE
+                        }
+                        socketio.emit('game_state', lite_state, to=rid)
                     else:
-                        state = room.update()
+                        # Обычный режим — шлём всё включая шайбу
                         socketio.emit('game_state', state, to=rid)
 
                     if room.state == 'finished':
