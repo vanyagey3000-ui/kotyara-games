@@ -22,6 +22,7 @@ class GameRoom:
         self.state = 'waiting'
         self.score = [0, 0]
         self.countdown = 3
+        self.p2p_active = False  # ← добавить
         self.start_time = None
         self.last_update = time.time()
         self.game_mode = '1v1'

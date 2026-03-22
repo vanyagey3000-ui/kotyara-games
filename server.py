@@ -558,6 +558,17 @@ def _handle_game_end(room, forfeit_player=None):
 
 # ═══ P2P Signaling ═══
 
+@socketio.on('p2p_established')
+def handle_p2p_established(data):
+    """Хост сообщает что P2P соединение установлено"""
+    if not current_user.is_authenticated:
+        return
+    room_id = data.get('room_id')
+    if room_id and room_id in game_rooms:
+        room = game_rooms[room_id]
+        room.p2p_active = True
+        print(f'P2P established for room {room_id}')
+
 @socketio.on('p2p_goal')
 def handle_p2p_goal(data):
     """P2P хост сообщает серверу о голе — сервер обновляет комнату"""
@@ -597,30 +608,26 @@ def game_loop():
             finished = []
             for rid, room in list(game_rooms.items()):
                 if room.state in ('playing', 'countdown'):
-                    state = room.update()
-                    socketio.emit('game_state', state, to=rid)
+                    # Если P2P активен — сервер НЕ считает физику,
+                    # только шлёт минимальный state для HUD/таймера
+                    if getattr(room, 'p2p_active', False) and room.state == 'playing':
+                        # Шлём только метаданные (таймер, состояние, счёт)
+                        state = room.get_state()  # без обновления физики
+                        socketio.emit('game_state', state, to=rid)
+                    else:
+                        state = room.update()
+                        socketio.emit('game_state', state, to=rid)
+
                     if room.state == 'finished':
                         finished.append(rid)
             for rid in finished:
                 if rid in game_rooms:
-                    try: _handle_game_end(game_rooms[rid])
+                    try:
+                        _handle_game_end(game_rooms[rid])
                     except Exception as e:
                         print('end err:', e)
                         import traceback; traceback.print_exc()
             eventlet.sleep(1 / 60)
-
-
-def cleanup_loop():
-    with app.app_context():
-        while True:
-            to_del = []
-            for rid, room in list(game_rooms.items()):
-                if room.state == 'finished' and (time.time() - room.last_update > 60):
-                    to_del.append(rid)
-            for rid in to_del:
-                game_rooms.pop(rid, None)
-            users_transitioning.clear()
-            eventlet.sleep(30)
 
 
 def create_app():
