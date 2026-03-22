@@ -558,6 +558,25 @@ def _handle_game_end(room, forfeit_player=None):
 
 # ═══ P2P Signaling ═══
 
+@socketio.on('p2p_goal')
+def handle_p2p_goal(data):
+    """P2P хост сообщает серверу о голе — сервер обновляет комнату"""
+    if not current_user.is_authenticated:
+        return
+    room_id = data.get('room_id')
+    if not room_id or room_id not in game_rooms:
+        return
+    room = game_rooms[room_id]
+    new_score = data.get('score', [0, 0])
+    room.score = [new_score[0], new_score[1]]
+
+    if room.score[0] >= room.MAX_SCORE or room.score[1] >= room.MAX_SCORE:
+        room.state = 'finished'
+        try:
+            _handle_game_end(room)
+        except Exception as e:
+            print('p2p_goal end err:', e)
+
 @socketio.on('p2p_signal')
 def handle_p2p_signal(data):
     """Просто пересылаем сигнал другому игроку в комнате"""

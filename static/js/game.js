@@ -8,13 +8,15 @@ var sock = null;
 
 var FW = 800, FH = 500, PR = 30, PKR = 15;
 var GW = 140, GY1 = (FH - GW) / 2, GY2 = (FH + GW) / 2;
+var MAX_SCORE = 7;
 
 var myX = 80, myY = FH / 2;
 var mouseX = 400, mouseY = 250;
 var lastSend = 0;
 
-var srvPuck = {x: FW/2, y: FH/2};
-var srvEnemy = {x: FW-80, y: FH/2};
+// Позиции для рендера
+var puck = {x: FW/2, y: FH/2, vx: 0, vy: 0};
+var enemyPad = {x: FW-80, y: FH/2};
 var drawPuck = {x: FW/2, y: FH/2};
 var drawEnemy = {x: FW-80, y: FH/2};
 
@@ -23,10 +25,14 @@ var goalFlash = 0;
 var trail = [];
 var TRAIL_MAX = 16;
 
-// Connection mode
 var connMode = localStorage.getItem('conn_type') || 'p2p';
 var p2pActive = false;
-var p2pReady = false;
+var isHost = false;
+
+// Физика шайбы (хост считает)
+var FRICTION = 0.995;
+var BOUNCE = 0.85;
+var SPEED_LIMIT = 18;
 
 var imgs = {};
 var bgImg = null;
@@ -50,15 +56,15 @@ if (typeof BG_IMAGE_URL !== 'undefined' && BG_IMAGE_URL) {
 }
 
 var SK = {
-    kompot: {p:'#ff8844',s:'#cc5500',f:'\uD83D\uDC31'},
-    karamelka: {p:'#ff69b4',s:'#cc3388',f:'\uD83C\uDF80'},
-    korzhik: {p:'#88bb44',s:'#558822',f:'\u26BD'},
-    papa: {p:'#4466aa',s:'#223366',f:'\uD83D\uDC54'},
-    mama: {p:'#dd66aa',s:'#993366',f:'\uD83D\uDC90'},
-    babushka: {p:'#996688',s:'#664455',f:'\uD83C\uDF6A'},
-    dedushka: {p:'#888866',s:'#555544',f:'\uD83C\uDFA3'},
-    nuke_kompot: {p:'#ff2200',s:'#ff8800',f:'\uD83D\uDD25'},
-    cyber_karamelka: {p:'#00ffcc',s:'#0088aa',f:'\uD83E\uDD16'}
+    kompot:{p:'#ff8844',s:'#cc5500',f:'\uD83D\uDC31'},
+    karamelka:{p:'#ff69b4',s:'#cc3388',f:'\uD83C\uDF80'},
+    korzhik:{p:'#88bb44',s:'#558822',f:'\u26BD'},
+    papa:{p:'#4466aa',s:'#223366',f:'\uD83D\uDC54'},
+    mama:{p:'#dd66aa',s:'#993366',f:'\uD83D\uDC90'},
+    babushka:{p:'#996688',s:'#664455',f:'\uD83C\uDF6A'},
+    dedushka:{p:'#888866',s:'#555544',f:'\uD83C\uDFA3'},
+    nuke_kompot:{p:'#ff2200',s:'#ff8800',f:'\uD83D\uDD25'},
+    cyber_karamelka:{p:'#00ffcc',s:'#0088aa',f:'\uD83E\uDD16'}
 };
 
 function initCanvas() {
@@ -74,8 +80,92 @@ initCanvas();
 function fmt(s) { var m=Math.floor(s/60),sec=Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
 function clamp(v,a,b) { return v<a?a:v>b?b:v; }
 function lerp(a,b,t) { return a+(b-a)*t; }
+function dist(x1,y1,x2,y2) { return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)); }
 
-// === SOCKET + P2P INIT ===
+// ═══ PUCK PHYSICS (хост считает) ═══
+
+function resetPuck() {
+    puck.x = FW / 2;
+    puck.y = FH / 2;
+    var angle = (Math.random() - 0.5);
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    puck.vx = 5 * dir * Math.cos(angle);
+    puck.vy = 5 * Math.sin(angle);
+}
+
+function updatePuckPhysics() {
+    // Движение
+    puck.x += puck.vx;
+    puck.y += puck.vy;
+    puck.vx *= FRICTION;
+    puck.vy *= FRICTION;
+
+    // Лимит скорости
+    var spd = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+    if (spd > SPEED_LIMIT) {
+        puck.vx *= SPEED_LIMIT / spd;
+        puck.vy *= SPEED_LIMIT / spd;
+    }
+
+    // Стены верх/низ
+    if (puck.y - PKR <= 0) {
+        puck.y = PKR;
+        puck.vy = Math.abs(puck.vy) * BOUNCE;
+    }
+    if (puck.y + PKR >= FH) {
+        puck.y = FH - PKR;
+        puck.vy = -Math.abs(puck.vy) * BOUNCE;
+    }
+
+    // Стены лево/право (вне ворот)
+    if (puck.x - PKR <= 0) {
+        if (puck.y > GY1 && puck.y < GY2) {
+            // ГОЛ! Игрок 2 забил
+            return 2;
+        }
+        puck.x = PKR;
+        puck.vx = Math.abs(puck.vx) * BOUNCE;
+    }
+    if (puck.x + PKR >= FW) {
+        if (puck.y > GY1 && puck.y < GY2) {
+            // ГОЛ! Игрок 1 забил
+            return 1;
+        }
+        puck.x = FW - PKR;
+        puck.vx = -Math.abs(puck.vx) * BOUNCE;
+    }
+
+    // Столкновение с моей клюшкой
+    collidePaddle(myX, myY);
+
+    // Столкновение с клюшкой противника
+    collidePaddle(enemyPad.x, enemyPad.y);
+
+    return 0;
+}
+
+function collidePaddle(padX, padY) {
+    var dx = puck.x - padX;
+    var dy = puck.y - padY;
+    var d = dist(puck.x, puck.y, padX, padY);
+    var minD = PKR + PR;
+
+    if (d < minD && d > 0.1) {
+        var nx = dx / d;
+        var ny = dy / d;
+        var overlap = minD - d;
+        puck.x += nx * overlap;
+        puck.y += ny * overlap;
+
+        var dot = puck.vx * nx + puck.vy * ny;
+        if (dot < 0) {
+            puck.vx -= 2.2 * dot * nx;
+            puck.vy -= 2.2 * dot * ny;
+        }
+    }
+}
+
+// ═══ SOCKET ═══
 
 function initGame() {
     sock = io({transports: ['websocket', 'polling'], reconnection: true});
@@ -90,55 +180,66 @@ function initGame() {
         myNum = d.player_number;
         gs = d.state;
         connected = true;
+        isHost = (myNum === 1);
         document.getElementById('waiting-overlay').style.display = 'none';
-        sync(d.state);
+        syncFull(d.state);
 
-        // Попробовать P2P если выбрано
         if (connMode === 'p2p' && typeof P2P !== 'undefined') {
-            console.log('Trying P2P...');
-            var isHost = (myNum === 1);
             P2P.onConnect = function() {
                 p2pActive = true;
-                p2pReady = true;
-                console.log('P2P CONNECTED! Direct data channel active.');
-                toast('P2P подключён! Минимальный пинг.');
+                toast('P2P connected! Zero lag.');
             };
             P2P.onDisconnect = function() {
                 p2pActive = false;
-                console.log('P2P disconnected, fallback to WebSocket');
             };
             P2P.onMessage = function(msg) {
-                handleP2PMessage(msg);
+                onP2PMsg(msg);
             };
             P2P.init(sock, ROOM_ID, isHost);
         }
     });
 
-    // WebSocket game state (fallback или основной)
     sock.on('game_state', function(state) {
         gs = state;
 
-        // Если P2P активен — игнорируем серверные данные для противника
-        // (получаем напрямую через P2P)
-        if (!p2pActive) {
-            applyServerState(state);
+        if (p2pActive) {
+            // В P2P режиме от сервера берём только состояние и счёт
+            if (state.state === 'countdown') {
+                document.getElementById('countdown-overlay').style.display = 'flex';
+                document.getElementById('countdown-num').textContent = state.countdown || '...';
+                syncFull(state);
+            } else {
+                document.getElementById('countdown-overlay').style.display = 'none';
+            }
+            // Сервер подтверждает счёт
+            if (state.score) {
+                score = [state.score[0], state.score[1]];
+            }
+            updateHUD(state);
         } else {
-            // Только счёт и состояние от сервера
+            // WebSocket fallback — всё от сервера
+            if (state.puck) {
+                puck.x = state.puck.x;
+                puck.y = state.puck.y;
+                puck.vx = state.puck.vx || 0;
+                puck.vy = state.puck.vy || 0;
+            }
+            var en = myNum === 1 ? '2' : '1';
+            if (state.paddles && state.paddles[en]) {
+                enemyPad.x = state.paddles[en].x;
+                enemyPad.y = state.paddles[en].y;
+            }
             if (state.score) {
                 if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
                     goalFlash = 25; trail = [];
                 }
                 score = [state.score[0], state.score[1]];
             }
-            if (state.puck) {
-                srvPuck.x = state.puck.x;
-                srvPuck.y = state.puck.y;
-            }
             updateHUD(state);
             if (state.state === 'countdown') {
                 document.getElementById('countdown-overlay').style.display = 'flex';
                 document.getElementById('countdown-num').textContent = state.countdown || '...';
-                sync(state);
+                syncFull(state);
             } else {
                 document.getElementById('countdown-overlay').style.display = 'none';
             }
@@ -162,44 +263,29 @@ function initGame() {
     }, 10000);
 }
 
-function handleP2PMessage(msg) {
-    // Получили позицию противника напрямую через P2P
+function onP2PMsg(msg) {
     if (msg.t === 'pos') {
-        srvEnemy.x = msg.x;
-        srvEnemy.y = msg.y;
+        // Позиция противника
+        enemyPad.x = msg.x;
+        enemyPad.y = msg.y;
+    }
+    if (msg.t === 'puck') {
+        // Позиция шайбы от хоста
+        puck.x = msg.x;
+        puck.y = msg.y;
+        puck.vx = msg.vx;
+        puck.vy = msg.vy;
+    }
+    if (msg.t === 'goal') {
+        // Хост сообщает о голе
+        score = [msg.s0, msg.s1];
+        goalFlash = 25;
+        trail = [];
+        updateHUDScore();
     }
 }
 
-function applyServerState(state) {
-    if (!state) return;
-    var en = myNum === 1 ? '2' : '1';
-
-    if (state.puck) {
-        srvPuck.x = state.puck.x;
-        srvPuck.y = state.puck.y;
-    }
-    if (state.paddles && state.paddles[en]) {
-        srvEnemy.x = state.paddles[en].x;
-        srvEnemy.y = state.paddles[en].y;
-    }
-    if (state.score) {
-        if (state.score[0] !== score[0] || state.score[1] !== score[1]) {
-            goalFlash = 25; trail = [];
-        }
-        score = [state.score[0], state.score[1]];
-    }
-    updateHUD(state);
-
-    if (state.state === 'countdown') {
-        document.getElementById('countdown-overlay').style.display = 'flex';
-        document.getElementById('countdown-num').textContent = state.countdown || '...';
-        sync(state);
-    } else {
-        document.getElementById('countdown-overlay').style.display = 'none';
-    }
-}
-
-function sync(state) {
+function syncFull(state) {
     if (!state) return;
     var my = String(myNum), en = myNum === 1 ? '2' : '1';
     if (state.paddles && state.paddles[my]) {
@@ -207,18 +293,25 @@ function sync(state) {
         mouseX = myX; mouseY = myY;
     }
     if (state.paddles && state.paddles[en]) {
-        srvEnemy.x = drawEnemy.x = state.paddles[en].x;
-        srvEnemy.y = drawEnemy.y = state.paddles[en].y;
+        enemyPad.x = drawEnemy.x = state.paddles[en].x;
+        enemyPad.y = drawEnemy.y = state.paddles[en].y;
     }
     if (state.puck) {
-        srvPuck.x = drawPuck.x = state.puck.x;
-        srvPuck.y = drawPuck.y = state.puck.y;
+        puck.x = drawPuck.x = state.puck.x;
+        puck.y = drawPuck.y = state.puck.y;
+        puck.vx = state.puck.vx || 0;
+        puck.vy = state.puck.vy || 0;
     }
     if (state.score) score = [state.score[0], state.score[1]];
     trail = [];
 }
 
-// === INPUT ===
+function updateHUDScore() {
+    document.getElementById('score-p1').textContent = score[0];
+    document.getElementById('score-p2').textContent = score[1];
+}
+
+// ═══ INPUT ═══
 
 function getGamePos(cx, cy) {
     var r = canvas.getBoundingClientRect();
@@ -251,8 +344,8 @@ function toast(msg) {
 
 function updateHUD(s) {
     if (!s) return;
-    document.getElementById('score-p1').textContent = s.score[0];
-    document.getElementById('score-p2').textContent = s.score[1];
+    document.getElementById('score-p1').textContent = s.score ? s.score[0] : score[0];
+    document.getElementById('score-p2').textContent = s.score ? s.score[1] : score[1];
     if (s.players) {
         if (s.players['1']) {
             document.getElementById('hud-p1-name').textContent = s.players['1'].username;
@@ -283,7 +376,9 @@ function showResult(result) {
     document.getElementById('result-rank').textContent = my.new_rank + ' (' + my.elo + ')';
 }
 
-// === GAME LOOP ===
+// ═══ GAME LOOP ═══
+
+var p2pSendCounter = 0;
 
 function gameLoop() {
     update();
@@ -293,54 +388,95 @@ function gameLoop() {
 
 function update() {
     if (!gs) return;
+    var playing = (gs.state === 'playing');
 
-    if (gs.state === 'playing') {
+    if (playing) {
+        // Моя клюшка
         var mx = mouseX, my = mouseY;
         if (myNum === 1) mx = clamp(mx, PR, FW/2-PR);
         else mx = clamp(mx, FW/2+PR, FW-PR);
         my = clamp(my, PR, FH-PR);
-
         myX = mx; myY = my;
 
         var now = performance.now();
         if (now - lastSend > 16) {
             lastSend = now;
-            var posData = {
-                x: Math.round(mx*10)/10,
-                y: Math.round(my*10)/10
-            };
 
-            // Отправляем серверу (для физики шайбы)
+            // Серверу всегда
             if (sock && connected) {
-                sock.volatile.emit('paddle_move', posData);
+                sock.volatile.emit('paddle_move', {
+                    x: Math.round(mx*10)/10,
+                    y: Math.round(my*10)/10
+                });
             }
 
-            // Отправляем напрямую противнику через P2P
+            // P2P — отправляем позицию противнику напрямую
             if (p2pActive && typeof P2P !== 'undefined') {
-                P2P.send({t: 'pos', x: posData.x, y: posData.y});
+                P2P.send({t:'pos', x:Math.round(mx*10)/10, y:Math.round(my*10)/10});
             }
         }
+
+        // ═══ P2P: хост считает физику шайбы ═══
+        if (p2pActive && isHost) {
+            var goalBy = updatePuckPhysics();
+
+            if (goalBy > 0) {
+                score[goalBy - 1]++;
+                goalFlash = 25;
+                trail = [];
+                updateHUDScore();
+
+                // Сообщаем противнику
+                P2P.send({t:'goal', s0:score[0], s1:score[1]});
+
+                // Сообщаем серверу для записи
+                if (sock && connected) {
+                    sock.emit('p2p_goal', {
+                        room_id: ROOM_ID,
+                        scorer: goalBy,
+                        score: score
+                    });
+                }
+
+                resetPuck();
+            }
+
+            // Отправляем шайбу противнику каждый 2й кадр
+            p2pSendCounter++;
+            if (p2pSendCounter % 2 === 0) {
+                P2P.send({
+                    t:'puck',
+                    x:Math.round(puck.x*10)/10,
+                    y:Math.round(puck.y*10)/10,
+                    vx:Math.round(puck.vx*100)/100,
+                    vy:Math.round(puck.vy*100)/100
+                });
+            }
+        }
+
+        // Гость в P2P: просто получает данные через onP2PMsg
+        // WebSocket: данные приходят через game_state
     }
 
-    // Интерполяция — P2P быстрее поэтому lerp быстрее
-    var t = p2pActive ? 0.6 : 0.4;
-    drawPuck.x = lerp(drawPuck.x, srvPuck.x, t);
-    drawPuck.y = lerp(drawPuck.y, srvPuck.y, t);
-    drawEnemy.x = lerp(drawEnemy.x, srvEnemy.x, t);
-    drawEnemy.y = lerp(drawEnemy.y, srvEnemy.y, t);
+    // Интерполяция для рендера
+    var t = p2pActive ? 0.7 : 0.4;
+    drawPuck.x = lerp(drawPuck.x, puck.x, t);
+    drawPuck.y = lerp(drawPuck.y, puck.y, t);
+    drawEnemy.x = lerp(drawEnemy.x, enemyPad.x, t);
+    drawEnemy.y = lerp(drawEnemy.y, enemyPad.y, t);
 
     trail.push({x: drawPuck.x, y: drawPuck.y});
     if (trail.length > TRAIL_MAX) trail.shift();
     if (goalFlash > 0) goalFlash--;
 }
 
-// === RENDER (same as before) ===
+// ═══ RENDER ═══
 
 function render() {
     if (!gs) return;
     var W=canvas.width, H=canvas.height, sx=W/FW, sy=H/FH, s=Math.min(sx,sy);
-
     ctx.clearRect(0,0,W,H);
+
     ctx.fillStyle='#e8f4f8'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle='rgba(162,210,255,0.35)';
     var sw=W/8; for(var i=0;i<8;i+=2) ctx.fillRect(i*sw,0,sw,H);
@@ -358,8 +494,8 @@ function render() {
     ctx.beginPath();ctx.arc(W/2,H/2,5*s,0,Math.PI*2);ctx.fillStyle='#4895ef';ctx.fill();
 
     var gy1=GY1*sy,gy2=GY2*sy,gw=14*sx;
-    drawGoal(0,gy1,gw,gy2-gy1,'#e63946',s);
-    drawGoal(W-gw,gy1,gw,gy2-gy1,'#4895ef',s);
+    drawGoalNet(0,gy1,gw,gy2-gy1,'#e63946',s);
+    drawGoalNet(W-gw,gy1,gw,gy2-gy1,'#4895ef',s);
 
     var fo=[[FW*.2,FH*.3],[FW*.2,FH*.7],[FW*.8,FH*.3],[FW*.8,FH*.7]];
     for(var fi=0;fi<fo.length;fi++){
@@ -373,8 +509,8 @@ function render() {
     if(goalFlash>0){ctx.fillStyle='rgba(255,255,255,'+(goalFlash/40)+')';ctx.fillRect(0,0,W,H);}
 
     for(var ti=1;ti<trail.length;ti++){
-        var ta=(ti/trail.length)*0.2,tr=(ti/trail.length)*PKR*s*0.5;
-        ctx.beginPath();ctx.arc(trail[ti].x*sx,trail[ti].y*sy,tr,0,Math.PI*2);
+        var ta=(ti/trail.length)*0.2,tr2=(ti/trail.length)*PKR*s*0.5;
+        ctx.beginPath();ctx.arc(trail[ti].x*sx,trail[ti].y*sy,tr2,0,Math.PI*2);
         ctx.fillStyle='rgba(26,26,46,'+ta+')';ctx.fill();
     }
 
@@ -390,19 +526,16 @@ function render() {
     drawPad(myX*sx,myY*sy,PR*s,myN,true,s);
 
     // P2P indicator
-    if (p2pActive) {
-        ctx.fillStyle = '#52b788';
-        ctx.beginPath(); ctx.arc(W-20,20,6,0,Math.PI*2); ctx.fill();
-        ctx.font = 'bold 10px Nunito,sans-serif';
-        ctx.fillStyle = '#52b788';
-        ctx.textAlign = 'right';
-        ctx.fillText('P2P', W-30, 24);
+    if(p2pActive){
+        ctx.fillStyle='#52b788';ctx.beginPath();ctx.arc(W-20,20,6,0,Math.PI*2);ctx.fill();
+        ctx.font='bold 10px Nunito,sans-serif';ctx.fillStyle='#52b788';ctx.textAlign='right';
+        ctx.fillText('P2P',W-30,24);
     }
 }
 
 function rRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.arcTo(x+w,y,x+w,y+r,r);c.lineTo(x+w,y+h-r);c.arcTo(x+w,y+h,x+w-r,y+h,r);c.lineTo(x+r,y+h);c.arcTo(x,y+h,x,y+h-r,r);c.lineTo(x,y+r);c.arcTo(x,y,x+r,y,r);c.closePath();}
 
-function drawGoal(x,y,w,h,color,s){
+function drawGoalNet(x,y,w,h,color,s){
     ctx.fillStyle=color+'40';ctx.fillRect(x,y,w,h);
     ctx.strokeStyle=color;ctx.lineWidth=1.5;
     var step=8*s;
@@ -416,11 +549,9 @@ function drawPad(x,y,r,numStr,isMe,s){
     if(gs.players&&gs.players[numStr])sk=gs.players[numStr].skin||'kompot';
     var skin=SK[sk]||SK.kompot;
     var tc=numStr==='1'?'#e63946':'#4895ef';
-
     ctx.beginPath();ctx.arc(x+2,y+4,r+2,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fill();
     ctx.beginPath();ctx.arc(x,y,r+4*s,0,Math.PI*2);ctx.fillStyle=tc;ctx.fill();
     ctx.strokeStyle='#1a1a2e';ctx.lineWidth=3;ctx.stroke();
-
     var img=imgs[sk+'_paddle'];
     if(img){ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();
         ctx.drawImage(img,x-r,y-r,r*2,r*2);ctx.restore();}
@@ -429,9 +560,7 @@ function drawPad(x,y,r,numStr,isMe,s){
         ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
         ctx.font=Math.round(r*1.1)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(skin.f,x,y);}
-
     ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2.5;ctx.stroke();
-
     if(gs.players&&gs.players[numStr]){
         var name=gs.players[numStr].username;
         var fs=Math.max(10,Math.round(12*s));
