@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Матч — Три Кота{% endblock %}
+{% block title %}Матч | KotayraGames{% endblock %}
 
 {% block head %}
 <style>
-    .navbar, .footer { display: none; }
+    .navbar, .footer, .site-announcement { display: none; }
     body { overflow: hidden; }
     .main-content { padding: 0; margin: 0; max-width: 100%; height: 100vh; }
 </style>
@@ -36,15 +36,58 @@
         <div class="countdown-num" id="countdown-num">3</div>
     </div>
 
+    <div class="disconnect-overlay" id="disconnect-overlay" style="display:none">
+        <div class="disconnect-card">
+            <span class="section-kicker">MATCH PAUSED</span>
+            <h2 id="disconnect-title">Игрок отключился!</h2>
+            <p class="disconnect-copy">
+                У него есть <strong id="disconnect-seconds">30</strong> секунд на переподключение.
+            </p>
+            <p class="disconnect-copy disconnect-copy-danger">
+                В случае не переподключения выдаётся запрет на вход в матчи на 1.5 минуты.
+            </p>
+        </div>
+    </div>
+
+    <div class="game-announcement-overlay" id="game-announcement-overlay" style="display:none">
+        <div class="game-announcement-card">
+            <span class="section-kicker">GLOBAL ANNOUNCEMENT</span>
+            <h2 id="game-announcement-title">Важное объявление</h2>
+            <p id="game-announcement-message"></p>
+        </div>
+    </div>
+
+    <div class="goal-celebration-overlay" id="goal-celebration-overlay" style="display:none">
+        <div class="goal-celebration-panel" id="goal-celebration-panel">
+            <div class="goal-stripes">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="goal-orb">
+                <img id="goal-skin-image" alt="goal skin" style="display:none">
+                <div class="goal-skin-fallback" id="goal-skin-fallback">K</div>
+            </div>
+            <div class="goal-player-name" id="goal-player-name">Игрок</div>
+            <div class="goal-title" id="goal-title">GOAL!</div>
+        </div>
+    </div>
+
     <div class="result-overlay" id="result-overlay" style="display:none">
-        <div class="result-card">
-            <h1 id="result-title">Победа!</h1>
+        <div class="result-card celebration-result-card" id="result-card">
+            <div class="goal-stripes result-stripes">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="goal-orb result-orb">
+                <img id="result-skin-image" alt="result skin" style="display:none">
+                <div class="goal-skin-fallback" id="result-skin-fallback">K</div>
+            </div>
+            <div class="goal-player-name" id="result-player-name">Игрок</div>
+            <h1 id="result-title">WIN!</h1>
             <div class="result-score">
                 <span id="result-score-p1">0</span> : <span id="result-score-p2">0</span>
             </div>
             <div class="result-details">
                 <div class="result-elo" id="result-elo">+25 ELO</div>
-                <div class="result-coins" id="result-coins">+150 🪙</div>
+                <div class="result-coins" id="result-coins">+150 монет</div>
                 <div class="result-rank" id="result-rank">Серебро</div>
             </div>
             <div class="result-buttons">
@@ -66,8 +109,6 @@
 {% block scripts %}
 <script>
     const ROOM_ID = '{{ room_id }}';
-
-    // Картинки скинов (серверный путь к обработанным)
     const SKIN_IMAGES = {{ skin_images | tojson }};
     const BG_IMAGE_URL = {{ (bg_url or 'null') | tojson }};
 </script>

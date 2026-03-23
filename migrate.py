@@ -38,6 +38,8 @@ def auto_migrate(app):
             'coins': 'INTEGER DEFAULT 500',
             'gems': 'INTEGER DEFAULT 10',
             'active_skin': "VARCHAR(50) DEFAULT 'kompot'",
+            'staff_role': "VARCHAR(20) DEFAULT 'player'",
+            'match_ban_until': 'DATETIME',
             'created_at': 'DATETIME',
             'last_login': 'DATETIME',
             'last_game': 'DATETIME',

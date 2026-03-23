@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Топы | KotayraGames{% endblock %}
+
+{% block content %}
+<section class="tops-shell">
+    <div class="tops-hero surface-card">
+        <div>
+            <span class="section-kicker">TOPS</span>
+            <h1 class="section-title">Топы KotayraGames</h1>
+            <p class="profile-member">
+                Глобальный рейтинг игроков по ELO и отдельные топы по активным скинам:
+                Компот, Карамелька и Коржик.
+            </p>
+        </div>
+
+        <div class="tops-hero-stats">
+            <div class="top-stat-pill">
+                <span>Глобальный #1</span>
+                <strong>{{ global_rows[0].user.username if global_rows else '---' }}</strong>
+            </div>
+            <div class="top-stat-pill">
+                <span>Лучший ELO</span>
+                <strong>{{ global_rows[0].user.elo if global_rows else 0 }}</strong>
+            </div>
+            <div class="top-stat-pill">
+                <span>Таблиц</span>
+                <strong>{{ skin_boards|length + 1 }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <section class="leaderboard-section">
+        <div class="section-head">
+            <div>
+                <span class="section-kicker">GLOBAL</span>
+                <h2 class="section-title">Глобальный топ по ELO</h2>
+            </div>
+            <span class="faceit-mini-level">TOP 50</span>
+        </div>
+
+        <div class="leaderboard-table">
+            <div class="lb-header">
+                <span>#</span>
+                <span>Игрок</span>
+                <span>ELO</span>
+                <span>LVL</span>
+                <span>Winrate</span>
+                <span>Скин</span>
+            </div>
+            {% if global_rows %}
+                {% for row in global_rows %}
+                <div class="lb-row {% if row.is_me %}lb-row-me{% endif %}">
+                    <span>#{{ row.position }}</span>
+                    <span class="tops-player-cell">
+                        <strong><a href="{{ url_for('profile', user_id=row.user.id) }}">{{ row.user.username }}</a></strong>
+                        <small>{{ row.user.rank_title }}</small>
+                    </span>
+                    <span class="lb-col-elo">{{ row.user.elo }}</span>
+                    <span>LVL {{ row.user.faceit_level }}</span>
+                    <span>{{ row.user.winrate }}%</span>
+                    <span class="tops-skin-tag">{{ row.user.active_skin }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="lb-empty">Пока нет игроков для глобального топа.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <div class="tops-grid">
+        {% for board in skin_boards %}
+        <section class="skin-top-card" style="--skin-accent: {{ board.accent }};">
+            <div class="skin-top-head">
+                <div class="skin-top-cover">
+                    {% set skin_image = image_url(board.skin_id ~ '_ui') %}
+                    {% if skin_image %}
+                        <img src="{{ skin_image }}" alt="{{ board.title }}">
+                    {% else %}
+                        <span>{{ board.skin_id[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <span class="section-kicker">ПО СКИНУ</span>
+                    <h2 class="section-title">{{ board.title }}</h2>
+                </div>
+            </div>
+
+            <div class="leaderboard-table">
+                <div class="lb-header">
+                    <span>#</span>
+                    <span>Игрок</span>
+                    <span>ELO</span>
+                    <span>LVL</span>
+                    <span>Победы</span>
+                    <span>Матчи</span>
+                </div>
+                {% if board.rows %}
+                    {% for row in board.rows %}
+                    <div class="lb-row {% if row.is_me %}lb-row-me{% endif %}">
+                        <span>#{{ row.position }}</span>
+                        <span class="tops-player-cell">
+                            <strong><a href="{{ url_for('profile', user_id=row.user.id) }}">{{ row.user.username }}</a></strong>
+                            <small>{{ row.user.rank_title }}</small>
+                        </span>
+                        <span class="lb-col-elo">{{ row.user.elo }}</span>
+                        <span>LVL {{ row.user.faceit_level }}</span>
+                        <span>{{ row.user.wins }}</span>
+                        <span>{{ row.user.total_games }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="lb-empty">С этим активным скином пока нет игроков в рейтинге.</div>
+                {% endif %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

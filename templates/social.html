@@ -20,7 +20,7 @@
                 {% for req in incoming_requests %}
                 <div class="social-row">
                     <div>
-                        <strong>{{ req.sender.username if req.sender else 'Игрок' }}</strong>
+                        <strong><a href="{{ url_for('profile', user_id=req.sender.id) }}">{{ req.sender.username if req.sender else 'Игрок' }}</a></strong>
                         <div class="social-muted">Заявка в друзья</div>
                     </div>
                     <div class="social-actions">
@@ -71,14 +71,9 @@
                     {% for member in party.members %}
                     <div class="social-row">
                         <div>
-                            <strong>{{ member.username }}</strong>
+                            <strong><a href="{{ url_for('profile', user_id=member.id) }}">{{ member.username }}</a></strong>
                             <div class="social-muted">ELO {{ member.elo }} · LVL {{ member.faceit_level }}{% if member.is_leader %} · лидер{% endif %}</div>
                         </div>
-                        {% if party.leader_id == current_user.id and member.id != current_user.id %}
-                        <form method="POST" action="{{ url_for('invite_to_party') }}">
-                            <input type="hidden" name="user_id" value="{{ member.id }}">
-                        </form>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -101,7 +96,7 @@
                 <div class="social-row">
                     <div>
                         <strong>Party #{{ invite.party_id }}</strong>
-                        <div class="social-muted">От игрока {{ invite.sender.username if invite.sender else 'Игрок' }}</div>
+                        <div class="social-muted">От игрока <a href="{{ url_for('profile', user_id=invite.sender.id) }}">{{ invite.sender.username if invite.sender else 'Игрок' }}</a></div>
                     </div>
                     <div class="social-actions">
                         <form method="POST" action="{{ url_for('respond_party_invite') }}">
@@ -128,7 +123,7 @@
             {% for candidate in recent_users %}
             <div class="social-row">
                 <div>
-                    <strong>{{ candidate.username }}</strong>
+                    <strong><a href="{{ url_for('profile', user_id=candidate.id) }}">{{ candidate.username }}</a></strong>
                     <div class="social-muted">ELO {{ candidate.elo }} · LVL {{ candidate.faceit_level }}</div>
                 </div>
                 <div class="social-actions">
@@ -151,7 +146,7 @@
                 {% for friend in friends %}
                 <div class="social-row">
                     <div>
-                        <strong>{{ friend.username }}</strong>
+                        <strong><a href="{{ url_for('profile', user_id=friend.id) }}">{{ friend.username }}</a></strong>
                         <div class="social-muted">ELO {{ friend.elo }} · LVL {{ friend.faceit_level }}</div>
                     </div>
                     <div class="social-actions">
@@ -175,7 +170,7 @@
                 {% for post in team_posts %}
                 <div class="social-post">
                     <div class="social-row social-row-top">
-                        <strong>{{ post.author.username if post.author else 'Игрок' }}</strong>
+                        <strong><a href="{{ url_for('profile', user_id=post.author.id) }}">{{ post.author.username if post.author else 'Игрок' }}</a></strong>
                         <span class="faceit-mini-level">{{ post.mode }}</span>
                     </div>
                     <div class="social-muted">{{ post.note }}</div>
@@ -196,13 +191,13 @@
             <h2 class="section-title">Последние диалоги</h2>
             {% if conversations %}
                 {% for partner in conversations %}
-                <a class="social-row social-row-link" href="{{ url_for('messages_page', user_id=partner.id) }}">
+                <div class="social-row social-row-link">
                     <div>
-                        <strong>{{ partner.username }}</strong>
+                        <strong><a href="{{ url_for('profile', user_id=partner.id) }}">{{ partner.username }}</a></strong>
                         <div class="social-muted">Открыть переписку</div>
                     </div>
-                    <span>→</span>
-                </a>
+                    <a href="{{ url_for('messages_page', user_id=partner.id) }}">→</a>
+                </div>
                 {% endfor %}
             {% else %}
                 <div class="social-empty">Диалогов пока нет.</div>

@@ -1,60 +1,96 @@
 {% extends "base.html" %}
-{% block title %}Настройки | Three Cats Faceit{% endblock %}
+{% block title %}Настройки | KotayraGames{% endblock %}
 
 {% block content %}
 <div class="auth-container">
-    <div class="auth-card" style="max-width: 520px;">
+    <div class="auth-card settings-card-wide">
         <div class="auth-header">
             <span class="auth-icon">S</span>
             <h1>Настройки</h1>
-            <p>Управляй аккаунтом и типом соединения.</p>
+            <p>Управляй аккаунтом, типом соединения и игровым звуком.</p>
         </div>
 
-        <h3 style="margin-bottom: 12px;">Тип подключения</h3>
+        <div class="settings-guide-grid">
+            <section class="surface-card settings-sound-card">
+                <span class="section-kicker">SOUND</span>
+                <h2 class="section-title">Игровой звук</h2>
+                <p class="profile-member">
+                    Звук влияет на старт матча, старт раунда и важные игровые сигналы. Если звук выключен
+                    или заблокирован браузером, игра может ощущаться хуже по таймингу и восприятию событий.
+                </p>
+
+                <div class="settings-sound-status" id="sound-status-card">
+                    <strong id="sound-status-title">Проверяем статус...</strong>
+                    <span id="sound-status-copy">Сейчас посмотрим, разрешен ли звук в браузере.</span>
+                </div>
+
+                <div class="hero-actions">
+                    <button type="button" class="btn btn-primary" id="sound-enable-btn">Включить звук</button>
+                    <button type="button" class="btn btn-secondary" id="sound-disable-btn">Выключить звук</button>
+                </div>
+            </section>
+
+            <section class="surface-card settings-guide-card">
+                <span class="section-kicker">GUIDE</span>
+                <h2 class="section-title">Как включить звук нормально</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>1. Нажми кнопку «Включить звук» выше.</strong><span>Это сохранит разрешение в браузере и даст игре право запускать важные аудио-сигналы без постоянных блокировок.</span></div>
+                    <div class="feature-item"><strong>2. Если браузер все равно молчит, кликни по странице.</strong><span>Некоторые браузеры разрешают звук только после явного действия пользователя: кнопки, клика или тапа по экрану.</span></div>
+                    <div class="feature-item"><strong>3. Проверь вкладку и системный звук.</strong><span>Убедись, что вкладка не заглушена, громкость Windows или телефона не на нуле и на устройстве не включен «Без звука».</span></div>
+                    <div class="feature-item"><strong>4. Если используешь Chrome, Edge или Яндекс.</strong><span>Нажми на иконку замка рядом с адресом сайта, открой настройки сайта и проверь, что звук для страницы не заблокирован.</span></div>
+                    <div class="feature-item"><strong>5. Если играешь с телефона.</strong><span>На iPhone выключи беззвучный режим и проверь Safari. На Android проверь громкость «Медиа» и не запрещен ли звук для вкладки браузера.</span></div>
+                    <div class="feature-item"><strong>6. Если раньше отказал в звуке.</strong><span>Открой эту страницу еще раз, нажми «Включить звук», затем обнови страницу или вернись в матч. Игра подхватит новое разрешение.</span></div>
+                </div>
+            </section>
+        </div>
+
+        <h3 style="margin: 4px 0 12px;">Тип подключения</h3>
         <div class="connection-selector" style="margin-bottom: 28px;">
             <label class="conn-option" id="opt-p2p">
                 <input type="radio" name="conn_type" value="p2p" onchange="setConnType('p2p')" id="radio-p2p">
                 <div class="conn-card">
                     <strong>P2P</strong>
-                    <p>Минимальная задержка и самый быстрый отклик.</p>
+                    <p>Минимальная задержка и самый быстрый отклик по управлению.</p>
                 </div>
             </label>
             <label class="conn-option" id="opt-ws">
                 <input type="radio" name="conn_type" value="websocket" onchange="setConnType('websocket')" id="radio-ws">
                 <div class="conn-card">
                     <strong>WebSocket</strong>
-                    <p>Стабильный резервный режим через сервер.</p>
+                    <p>Стабильный резервный режим через сервер, если P2P не подходит.</p>
                 </div>
             </label>
         </div>
 
-        <h3 style="margin-bottom: 12px;">Сменить ник</h3>
-        <form method="POST" class="auth-form" style="margin-bottom: 28px;">
-            <input type="hidden" name="action" value="change_username">
-            <div class="form-group">
-                <label>Новый ник</label>
-                <input type="text" name="new_username" placeholder="3-20 символов" minlength="3" maxlength="20" required value="{{ current_user.username }}">
-            </div>
-            <button type="submit" class="btn btn-primary btn-full">Обновить ник</button>
-        </form>
+        <div class="settings-forms-grid">
+            <form method="POST" class="auth-form">
+                <input type="hidden" name="action" value="change_username">
+                <h3 style="margin-bottom: 12px;">Сменить ник</h3>
+                <div class="form-group">
+                    <label>Новый ник</label>
+                    <input type="text" name="new_username" placeholder="3-20 символов" minlength="3" maxlength="20" required value="{{ current_user.username }}">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Обновить ник</button>
+            </form>
 
-        <h3 style="margin-bottom: 12px;">Сменить пароль</h3>
-        <form method="POST" class="auth-form">
-            <input type="hidden" name="action" value="change_password">
-            <div class="form-group">
-                <label>Старый пароль</label>
-                <input type="password" name="old_password" placeholder="Текущий пароль" required>
-            </div>
-            <div class="form-group">
-                <label>Новый пароль</label>
-                <input type="password" name="new_password" placeholder="Минимум 6 символов" minlength="6" required>
-            </div>
-            <div class="form-group">
-                <label>Повтор пароля</label>
-                <input type="password" name="new_password2" placeholder="Повтори новый пароль" required>
-            </div>
-            <button type="submit" class="btn btn-secondary btn-full">Сменить пароль</button>
-        </form>
+            <form method="POST" class="auth-form">
+                <input type="hidden" name="action" value="change_password">
+                <h3 style="margin-bottom: 12px;">Сменить пароль</h3>
+                <div class="form-group">
+                    <label>Старый пароль</label>
+                    <input type="password" name="old_password" placeholder="Текущий пароль" required>
+                </div>
+                <div class="form-group">
+                    <label>Новый пароль</label>
+                    <input type="password" name="new_password" placeholder="Минимум 6 символов" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label>Повтор пароля</label>
+                    <input type="password" name="new_password2" placeholder="Повтори новый пароль" required>
+                </div>
+                <button type="submit" class="btn btn-secondary btn-full">Сменить пароль</button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -65,9 +101,49 @@ function setConnType(type) {
     localStorage.setItem('conn_type', type);
 }
 
+function updateSoundSettingsState() {
+    var enabled = window.KotayraSound && window.KotayraSound.isEnabled();
+    var title = document.getElementById('sound-status-title');
+    var copy = document.getElementById('sound-status-copy');
+    var card = document.getElementById('sound-status-card');
+    if (!title || !copy || !card) return;
+
+    if (enabled) {
+        title.textContent = 'Звук включен';
+        copy.textContent = 'Старт матча, старт раунда и игровые сигналы будут воспроизводиться, если браузер не блокирует вкладку вручную.';
+        card.classList.add('is-enabled');
+        card.classList.remove('is-disabled');
+    } else {
+        title.textContent = 'Звук выключен';
+        copy.textContent = 'Включи звук кнопкой выше. После этого кликни по странице или обнови вкладку, если браузер раньше блокировал аудио.';
+        card.classList.add('is-disabled');
+        card.classList.remove('is-enabled');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var saved = localStorage.getItem('conn_type') || 'p2p';
     document.getElementById('radio-' + (saved === 'p2p' ? 'p2p' : 'ws')).checked = true;
+
+    updateSoundSettingsState();
+
+    document.getElementById('sound-enable-btn').addEventListener('click', async function() {
+        if (window.KotayraSound) {
+            await window.KotayraSound.setEnabled(true, true);
+        } else {
+            localStorage.setItem('kotayra_sound_enabled', '1');
+        }
+        updateSoundSettingsState();
+    });
+
+    document.getElementById('sound-disable-btn').addEventListener('click', function() {
+        if (window.KotayraSound) {
+            window.KotayraSound.setEnabled(false, false);
+        } else {
+            localStorage.setItem('kotayra_sound_enabled', '0');
+        }
+        updateSoundSettingsState();
+    });
 });
 </script>
 {% endblock %}

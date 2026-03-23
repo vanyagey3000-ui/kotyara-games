@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Чат | Three Cats Faceit{% endblock %}
+{% block title %}Чат | KotayraGames{% endblock %}
 
 {% block content %}
 <div class="chat-container">
@@ -13,9 +13,27 @@
     <div class="chat-box" id="chat-box">
         {% for msg in messages %}
         <div class="chat-msg">
+            {% set chat_avatar = image_url((msg.user.active_skin if msg.user else 'kompot') ~ '_ui') %}
+            <a href="{{ url_for('profile', user_id=msg.user_id) }}" class="chat-avatar">
+                {% if chat_avatar %}
+                    <img src="{{ chat_avatar }}" alt="{{ msg.username }}">
+                {% else %}
+                    <span>{{ msg.username[0] }}</span>
+                {% endif %}
+            </a>
             <span class="chat-time">{{ msg.created_at.strftime('%H:%M') }}</span>
-            <a href="{{ url_for('profile', user_id=msg.user_id) }}" class="chat-name">{{ msg.username }}</a>
-            <span class="chat-text">{{ msg.message }}</span>
+            {% if msg.user and msg.user.staff_role == 'moderator' %}
+                <span class="chat-role-prefix role-moderator">Модератор</span>
+            {% elif msg.user and msg.user.staff_role == 'creator' %}
+                <span class="chat-role-prefix role-creator">Создатель</span>
+            {% endif %}
+            <a href="{{ url_for('profile', user_id=msg.user_id) }}" class="chat-name {% if msg.user and msg.user.staff_role == 'moderator' %}chat-name-moderator{% elif msg.user and msg.user.staff_role == 'creator' %}chat-name-creator{% endif %}">
+                {{ msg.username }}
+            </a>
+            <span class="chat-sep">:</span>
+            <span class="chat-text {% if msg.user and msg.user.staff_role == 'moderator' %}chat-text-moderator{% elif msg.user and msg.user.staff_role == 'creator' %}chat-text-creator{% endif %}">
+                {{ msg.message }}
+            </span>
         </div>
         {% endfor %}
     </div>
@@ -40,6 +58,37 @@ function sendChatMsg(e) {
     inp.value = '';
 }
 
+function buildChatRole(role) {
+    if (role === 'moderator') {
+        return '<span class="chat-role-prefix role-moderator">Модератор</span>';
+    }
+    if (role === 'creator') {
+        return '<span class="chat-role-prefix role-creator">Создатель</span>';
+    }
+    return '';
+}
+
+function buildChatAvatar(userId, username, skin) {
+    var safeName = escapeHtml(username || 'Игрок');
+    var letter = safeName ? safeName.charAt(0) : 'I';
+    var imageHtml = skin
+        ? '<img src="/static/images/processed/' + encodeURIComponent(skin) + '_ui.png" alt="' + safeName + '" onerror="this.remove()">'
+        : '<span>' + letter + '</span>';
+    return '<a href="/profile/' + userId + '" class="chat-avatar">' + imageHtml + '</a>';
+}
+
+function buildChatNameClass(role) {
+    if (role === 'moderator') return 'chat-name chat-name-moderator';
+    if (role === 'creator') return 'chat-name chat-name-creator';
+    return 'chat-name';
+}
+
+function buildChatTextClass(role) {
+    if (role === 'moderator') return 'chat-text chat-text-moderator';
+    if (role === 'creator') return 'chat-text chat-text-creator';
+    return 'chat-text';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     if (!window.socket) return;
 
@@ -47,9 +96,12 @@ document.addEventListener('DOMContentLoaded', function() {
         var box = document.getElementById('chat-box');
         var div = document.createElement('div');
         div.className = 'chat-msg chat-msg-new';
-        div.innerHTML = '<span class="chat-time">' + data.time + '</span>' +
-            '<a href="/profile/' + data.user_id + '" class="chat-name">' + data.username + '</a>' +
-            '<span class="chat-text">' + escapeHtml(data.message) + '</span>';
+        div.innerHTML = buildChatAvatar(data.user_id, data.username, data.skin) +
+            '<span class="chat-time">' + data.time + '</span>' +
+            buildChatRole(data.staff_role) +
+            '<a href="/profile/' + data.user_id + '" class="' + buildChatNameClass(data.staff_role) + '">' + escapeHtml(data.username) + '</a>' +
+            '<span class="chat-sep">:</span>' +
+            '<span class="' + buildChatTextClass(data.staff_role) + '">' + escapeHtml(data.message) + '</span>';
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
     });

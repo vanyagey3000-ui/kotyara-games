@@ -24,8 +24,8 @@
             <a href="{{ url_for('index') }}" class="hub-menu-item">Главная</a>
             <a href="{{ url_for('shop') }}" class="hub-menu-item">Инвентарь</a>
             <a href="{{ url_for('profile') }}" class="hub-menu-item">Персонаж</a>
-            <a href="{{ url_for('chat_page') }}" class="hub-menu-item">Друзья</a>
-            <a href="{{ url_for('profile') }}" class="hub-menu-item active">Рейтинг</a>
+            <a href="{{ url_for('social_page') }}" class="hub-menu-item">Друзья</a>
+            <a href="{{ url_for('tops_page') }}" class="hub-menu-item active">Рейтинг</a>
             <a href="{{ url_for('shop') }}" class="hub-menu-item">Магазин</a>
         </nav>
     </aside>
@@ -81,7 +81,7 @@
             <button class="hub-stack-btn hub-stack-btn-primary" id="btn-find-match" onclick="findMatch()">Играть</button>
             <a href="{{ url_for('shop') }}" class="hub-stack-btn">Инвентарь</a>
             <a href="{{ url_for('profile') }}" class="hub-stack-btn">Персонаж</a>
-            <a href="{{ url_for('chat_page') }}" class="hub-stack-btn">Друзья</a>
+            <a href="{{ url_for('social_page') }}" class="hub-stack-btn">Друзья</a>
         </div>
 
         <div class="hub-mode-panel" id="mode-selector">
@@ -173,6 +173,16 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!window.socket) return;
 
     window.socket.on('queue_status', function(data) {
+        if (data.status === 'banned') {
+            isSearching = false;
+            clearInterval(searchInterval);
+            document.getElementById('mode-selector').style.opacity = '1';
+            document.getElementById('search-status').style.display = 'none';
+            if (window.showToast) {
+                window.showToast('Вход в матчи временно закрыт на ' + formatTime(data.remaining_seconds || 0), 'error');
+            }
+            return;
+        }
         if (data.queue_size) {
             document.getElementById('queue-size').textContent = data.queue_size;
         }

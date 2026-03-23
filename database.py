@@ -44,6 +44,8 @@ class User(UserMixin, db.Model):
     gems = db.Column(db.Integer, default=10)
 
     active_skin = db.Column(db.String(50), default='kompot')
+    staff_role = db.Column(db.String(20), default='player')
+    match_ban_until = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -101,6 +103,26 @@ class User(UserMixin, db.Model):
         return FriendRequest.query.filter_by(recipient_id=self.id, status='pending').count()
 
     @property
+    def is_moderator(self):
+        return self.staff_role == 'moderator'
+
+    @property
+    def is_creator(self):
+        return self.staff_role == 'creator'
+
+    @property
+    def has_active_match_ban(self):
+        if not self.match_ban_until:
+            return False
+        return self.match_ban_until > datetime.now(timezone.utc)
+
+    @property
+    def match_ban_seconds_left(self):
+        if not self.has_active_match_ban:
+            return 0
+        return max(0, int((self.match_ban_until - datetime.now(timezone.utc)).total_seconds()))
+
+    @property
     def faceit_level_info(self):
         for idx, level in enumerate(FACEIT_LEVELS):
             if self.elo <= level['max_elo'] or idx == len(FACEIT_LEVELS) - 1:
@@ -153,7 +175,9 @@ class User(UserMixin, db.Model):
             'total_games': self.total_games, 'winrate': self.winrate,
             'coins': self.coins, 'gems': self.gems,
             'active_skin': self.active_skin,
-            'is_online': self.is_online
+            'is_online': self.is_online,
+            'staff_role': self.staff_role,
+            'match_ban_seconds_left': self.match_ban_seconds_left
         }
 
 
@@ -315,6 +339,31 @@ class TeamFinderPost(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class SiteAnnouncement(db.Model):
+    __tablename__ = 'site_announcements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(140), nullable=False)
+    message = db.Column(db.String(1000), nullable=False)
+    level = db.Column(db.String(20), default='info')
+    created_by = db.Column(db.String(64), default='Admin Panel')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class PlayerReport(db.Model):
+    __tablename__ = 'player_reports'
+
+    id = db.Column(db.Integer, primary_key=True)
+    reporter_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    reporter_username = db.Column(db.String(32), nullable=False)
+    target_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    target_username = db.Column(db.String(32), nullable=False)
+    reason = db.Column(db.String(500), nullable=False)
+    status = db.Column(db.String(20), default='open')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 def calculate_elo(winner_elo, loser_elo, k=32, draw=False):
     expected_w = 1 / (1 + math.pow(10, (loser_elo - winner_elo) / 400))
     expected_l = 1 / (1 + math.pow(10, (winner_elo - loser_elo) / 400))
@@ -365,6 +414,13 @@ def seed_shop_items():
         {'item_id': 'cyber_karamelka', 'name': 'Кибер-Карамелька', 'description': 'Из будущего!',
          'category': 'skin', 'price_coins': 10000, 'price_gems': 50, 'rarity': 'legendary',
          'required_elo': 2000, 'primary_color': '#00ffcc', 'secondary_color': '#0088aa', 'emoji': '🤖'},
+        {'item_id': 'lyapochka', 'name': 'Ляпочка', 'description': 'Новый редкий образ за монеты.',
+         'category': 'skin', 'price_coins': 2600, 'rarity': 'rare',
+         'primary_color': '#ff8ca8', 'secondary_color': '#c24b73', 'emoji': '🎀'},
+
+        {'item_id': 'bantik', 'name': 'Бантик', 'description': 'Эпический стиль для коллекции и каток.',
+         'category': 'skin', 'price_coins': 5200, 'rarity': 'epic',
+         'primary_color': '#ff6bb9', 'secondary_color': '#7f4dff', 'emoji': '✨'},
     ]
 
     for item_data in items:

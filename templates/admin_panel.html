@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel | KotayraGames{% endblock %}
+
+{% block content %}
+<section class="admin-shell">
+    {% if not unlocked %}
+    <div class="auth-container">
+        <div class="auth-card admin-gate-card">
+            <div class="auth-header">
+                <div class="auth-icon">K</div>
+                <h1>Admin Access</h1>
+                <p>Скрытая панель управления платформой. Для входа нужен отдельный пароль.</p>
+            </div>
+
+            <form method="POST" class="auth-form">
+                <input type="hidden" name="action" value="unlock_admin_panel">
+                <input type="password" name="admin_password" placeholder="Пароль админ-панели" autocomplete="current-password" required>
+                <button type="submit" class="btn btn-primary">Войти в админку</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="section-head">
+        <div>
+            <span class="section-kicker">CONTROL CENTER</span>
+            <h1 class="section-title">Админ-панель KotayraGames</h1>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="lock_admin_panel">
+            <button type="submit" class="btn btn-secondary">Заблокировать панель</button>
+        </form>
+    </div>
+
+    <div class="stats-grid admin-stats-grid">
+        <div class="stat-card"><div class="stat-value">{{ stats.users }}</div><div class="stat-name">Игроков</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.online }}</div><div class="stat-name">Онлайн</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.active_games }}</div><div class="stat-name">Активных матчей</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.pending_friend_requests }}</div><div class="stat-name">Friend requests</div></div>
+    </div>
+
+    <div class="admin-grid">
+        <section class="surface-card admin-card">
+            <span class="section-kicker">ANNOUNCEMENTS</span>
+            <h2 class="section-title">Глобальное объявление</h2>
+            <form method="POST" class="auth-form">
+                <input type="hidden" name="action" value="broadcast_announcement">
+                <input type="text" name="title" placeholder="Заголовок объявления" maxlength="140" required>
+                <textarea name="message" placeholder="Текст для всех игроков, включая тех, кто сейчас в матче..." maxlength="1000" required></textarea>
+                <select name="level">
+                    <option value="info">Info</option>
+                    <option value="warning">Warning</option>
+                    <option value="alert">Alert</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Разослать всем игрокам</button>
+            </form>
+
+            {% if active_announcement %}
+            <div class="admin-inline-note">
+                <strong>{{ active_announcement.title }}</strong>
+                <span>{{ active_announcement.message }}</span>
+                <form method="POST">
+                    <input type="hidden" name="action" value="clear_active_announcement">
+                    <button type="submit" class="btn btn-secondary">Снять объявление</button>
+                </form>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="surface-card admin-card">
+            <span class="section-kicker">STAFF</span>
+            <h2 class="section-title">Выдача ролей по username</h2>
+            <form method="POST" class="auth-form">
+                <input type="hidden" name="action" value="set_staff_role">
+                <input type="text" name="username" placeholder="Username игрока" required>
+                <select name="staff_role">
+                    <option value="moderator">Модератор</option>
+                    <option value="creator">Создатель</option>
+                    <option value="player">Снять роль</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Обновить роль</button>
+            </form>
+
+            <div class="admin-inline-note">
+                <strong>Как отображается в чате</strong>
+                <span><b class="demo-mod-label">Модератор Nick:</b> <span class="demo-mod-text">сообщение с синим акцентом</span></span>
+                <span><b class="demo-creator-label">Создатель Nick:</b> <span class="demo-creator-text">сообщение с рубиновым градиентом</span></span>
+            </div>
+        </section>
+    </div>
+
+    <div class="admin-grid">
+        <section class="surface-card admin-card">
+            <span class="section-kicker">REPORTS</span>
+            <h2 class="section-title">Жалобы игроков</h2>
+            <div class="admin-list">
+                {% if reports %}
+                    {% for report in reports %}
+                    <div class="admin-entry static">
+                        <div class="admin-entry-body">
+                            <strong>{{ report.target_username }} Нарушил: {{ report.reason }} Ай ай ай!! Как так то а ?</strong>
+                            <span>Репортёр: <a href="{{ url_for('profile', user_id=report.reporter_id) }}">{{ report.reporter_username }}</a> · {{ report.created_at.strftime('%d.%m %H:%M') }} · {{ report.status }}</span>
+                            <div class="social-actions">
+                                {% if report.target_user_id %}
+                                <a href="{{ url_for('profile', user_id=report.target_user_id) }}" class="btn btn-secondary">Профиль нарушителя</a>
+                                {% endif %}
+                                <form method="POST">
+                                    <input type="hidden" name="action" value="resolve_report">
+                                    <input type="hidden" name="report_id" value="{{ report.id }}">
+                                    <button type="submit" class="btn btn-primary">Отметить обработанной</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="social-empty">Жалоб пока нет.</div>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="surface-card admin-card">
+            <span class="section-kicker">ROOMS</span>
+            <h2 class="section-title">Активные комнаты и очереди</h2>
+            <div class="admin-inline-note">
+                <span>1v1: {{ queue_snapshot['1v1'] }}</span>
+                <span>2v2: {{ queue_snapshot['2v2'] }}</span>
+                <span>5v5: {{ queue_snapshot['5v5'] }}</span>
+            </div>
+            <div class="admin-list">
+                {% if active_rooms %}
+                    {% for room in active_rooms %}
+                    <div class="admin-entry static">
+                        <div class="admin-entry-body">
+                            <strong>Room {{ room.room_id }}</strong>
+                            <span>State: {{ room.state }} · Mode: {{ room.mode }} · Score: {{ room.score }}</span>
+                            <span>Players: {{ room.players|join(', ') }}</span>
+                            {% if room.disconnect_username %}
+                            <span>Отключён: {{ room.disconnect_username }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="social-empty">Сейчас нет активных матчей.</div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <div class="admin-grid admin-grid-wide">
+        <section class="surface-card admin-card">
+            <span class="section-kicker">PLAYERS</span>
+            <h2 class="section-title">Игроки и быстрое управление</h2>
+            <div class="admin-list">
+                {% for user in users %}
+                <details class="admin-entry">
+                    <summary>
+                        <span><strong>{{ user.username }}</strong> · ELO {{ user.elo }} · {{ user.staff_role }}</span>
+                        <span>{{ 'онлайн' if user.is_online else 'offline' }}</span>
+                    </summary>
+                    <div class="admin-entry-body">
+                        <form method="POST" class="admin-form-grid">
+                            <input type="hidden" name="action" value="update_user">
+                            <input type="hidden" name="user_id" value="{{ user.id }}">
+                            <input type="text" name="username" value="{{ user.username }}" placeholder="Username">
+                            <input type="email" name="email" value="{{ user.email }}" placeholder="Email">
+                            <input type="number" name="elo" value="{{ user.elo }}" placeholder="ELO">
+                            <input type="number" name="coins" value="{{ user.coins }}" placeholder="Coins">
+                            <input type="number" name="gems" value="{{ user.gems }}" placeholder="Gems">
+                            <input type="text" name="active_skin" value="{{ user.active_skin }}" placeholder="Активный скин">
+                            <select name="staff_role">
+                                <option value="player" {% if user.staff_role == 'player' %}selected{% endif %}>Игрок</option>
+                                <option value="moderator" {% if user.staff_role == 'moderator' %}selected{% endif %}>Модератор</option>
+                                <option value="creator" {% if user.staff_role == 'creator' %}selected{% endif %}>Создатель</option>
+                            </select>
+                            <input type="number" name="match_ban_seconds" value="{{ user.match_ban_seconds_left }}" placeholder="Бан на матчи, сек">
+                            <button type="submit" class="btn btn-primary">Сохранить игрока</button>
+                        </form>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="delete_user">
+                            <input type="hidden" name="user_id" value="{{ user.id }}">
+                            <button type="submit" class="btn btn-secondary">Удалить игрока</button>
+                        </form>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="surface-card admin-card">
+            <span class="section-kicker">MARKET</span>
+            <h2 class="section-title">Добавление и редактирование предметов</h2>
+
+            <details class="admin-entry admin-entry-create">
+                <summary>Добавить новый предмет</summary>
+                <div class="admin-entry-body">
+                    <form method="POST" class="admin-form-grid">
+                        <input type="hidden" name="action" value="save_shop_item">
+                        <input type="text" name="item_id" placeholder="item_id" required>
+                        <input type="text" name="name" placeholder="Название" required>
+                        <input type="text" name="category" value="skin" placeholder="Категория">
+                        <input type="text" name="rarity" value="common" placeholder="Редкость">
+                        <input type="number" name="price_coins" value="0" placeholder="Coins">
+                        <input type="number" name="price_gems" value="0" placeholder="Gems">
+                        <input type="number" name="required_elo" value="0" placeholder="Required ELO">
+                        <input type="number" name="sort_order" value="0" placeholder="Sort order">
+                        <input type="text" name="primary_color" value="#ffffff" placeholder="Primary color">
+                        <input type="text" name="secondary_color" value="#000000" placeholder="Secondary color">
+                        <input type="text" name="emoji" value="🎮" placeholder="Emoji">
+                        <textarea name="description" placeholder="Описание предмета"></textarea>
+                        <label class="admin-checkbox">
+                            <input type="checkbox" name="is_available" value="1" checked>
+                            <span>Доступен в магазине</span>
+                        </label>
+                        <button type="submit" class="btn btn-primary">Создать предмет</button>
+                    </form>
+                </div>
+            </details>
+
+            <div class="admin-list">
+                {% for item in shop_items %}
+                <details class="admin-entry">
+                    <summary>
+                        <span><strong>{{ item.name }}</strong> · {{ item.item_id }}</span>
+                        <span>{{ item.category }} · {{ item.rarity }}</span>
+                    </summary>
+                    <div class="admin-entry-body">
+                        <form method="POST" class="admin-form-grid">
+                            <input type="hidden" name="action" value="save_shop_item">
+                            <input type="hidden" name="shop_db_id" value="{{ item.id }}">
+                            <input type="text" name="item_id" value="{{ item.item_id }}" placeholder="item_id">
+                            <input type="text" name="name" value="{{ item.name }}" placeholder="Название">
+                            <input type="text" name="category" value="{{ item.category }}" placeholder="Категория">
+                            <input type="text" name="rarity" value="{{ item.rarity }}" placeholder="Редкость">
+                            <input type="number" name="price_coins" value="{{ item.price_coins }}" placeholder="Coins">
+                            <input type="number" name="price_gems" value="{{ item.price_gems }}" placeholder="Gems">
+                            <input type="number" name="required_elo" value="{{ item.required_elo }}" placeholder="Required ELO">
+                            <input type="number" name="sort_order" value="{{ item.sort_order }}" placeholder="Sort order">
+                            <input type="text" name="primary_color" value="{{ item.primary_color }}" placeholder="Primary color">
+                            <input type="text" name="secondary_color" value="{{ item.secondary_color }}" placeholder="Secondary color">
+                            <input type="text" name="emoji" value="{{ item.emoji }}" placeholder="Emoji">
+                            <textarea name="description" placeholder="Описание">{{ item.description }}</textarea>
+                            <label class="admin-checkbox">
+                                <input type="checkbox" name="is_available" value="1" {% if item.is_available %}checked{% endif %}>
+                                <span>Доступен в магазине</span>
+                            </label>
+                            <button type="submit" class="btn btn-primary">Сохранить предмет</button>
+                        </form>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="delete_shop_item">
+                            <input type="hidden" name="shop_db_id" value="{{ item.id }}">
+                            <button type="submit" class="btn btn-secondary">Удалить предмет</button>
+                        </form>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    <div class="admin-grid">
+        <section class="surface-card admin-card">
+            <span class="section-kicker">CHAT LOG</span>
+            <h2 class="section-title">Последние сообщения общего чата</h2>
+            <div class="admin-list">
+                {% for msg in recent_chat %}
+                <div class="admin-entry static">
+                    <div class="admin-entry-body admin-chat-line">
+                        <span><strong>{{ msg.username }}</strong> · {{ msg.created_at.strftime('%d.%m %H:%M') }}</span>
+                        <span>{{ msg.message }}</span>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="delete_chat_message">
+                            <input type="hidden" name="message_id" value="{{ msg.id }}">
+                            <button type="submit" class="btn btn-secondary">Удалить</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

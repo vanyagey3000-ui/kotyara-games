@@ -14,7 +14,6 @@
                     <span>{{ user.username[0] }}</span>
                 {% endif %}
             </div>
-            <div class="profile-hero-level">{{ faceit.level }}</div>
         </div>
 
         <div class="profile-hero-main">
@@ -29,15 +28,14 @@
             </div>
             <p class="profile-member">Игрок в KotayraGames с {{ user.created_at.strftime('%d.%m.%Y') }}</p>
 
-            <div class="faceit-progress-card">
-                <div class="faceit-progress-head">
-                    <span>Прогресс уровня</span>
-                    <span>{{ faceit.current_elo }} ELO</span>
+            <div class="faceit-progress-card faceit-progress-card-circle">
+                <div class="faceit-progress-circle" style="--progress: {{ faceit.progress_percent }}%; --level-color: {{ faceit.color }};">
+                    <div class="faceit-progress-circle-inner">
+                        <span class="faceit-progress-level">LVL {{ faceit.level }}</span>
+                    </div>
+                    <div class="faceit-progress-notch"></div>
                 </div>
-                <div class="faceit-progress-bar">
-                    <div class="faceit-progress-fill" style="width: {{ faceit.progress_percent }}%; --level-color: {{ faceit.color }};"></div>
-                    <div class="faceit-progress-level">LVL {{ faceit.level }}</div>
-                </div>
+
                 <div class="faceit-progress-foot">
                     <span>{{ faceit.min_elo }} ELO</span>
                     {% if faceit.next_level %}
@@ -52,6 +50,11 @@
             <div class="profile-quick-links">
                 <a href="{{ url_for('social_page') }}" class="hub-stack-btn">Друзья и пати</a>
                 <a href="{{ url_for('messages_page') }}" class="hub-stack-btn">Личные сообщения</a>
+            </div>
+            {% else %}
+            <div class="profile-quick-links">
+                <a href="{{ url_for('messages_page', user_id=user.id) }}" class="hub-stack-btn">Написать</a>
+                <a href="#report-player" class="hub-stack-btn">Пожаловаться</a>
             </div>
             {% endif %}
         </div>
@@ -71,6 +74,23 @@
             </div>
         </div>
     </div>
+
+    {% if user.id != current_user.id %}
+    <section class="surface-card" id="report-player">
+        <div class="section-head">
+            <div>
+                <span class="section-kicker">REPORT</span>
+                <h2 class="section-title">Жалоба на игрока</h2>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('report_player') }}" class="auth-form">
+            <input type="hidden" name="target_user_id" value="{{ user.id }}">
+            <input type="hidden" name="target_username" value="{{ user.username }}">
+            <textarea name="reason" placeholder="Опиши нарушение этого игрока" maxlength="500" required></textarea>
+            <button type="submit" class="btn btn-primary">Отправить в админ-панель</button>
+        </form>
+    </section>
+    {% endif %}
 
     <section class="stats-grid">
         <div class="stat-card"><div class="stat-value">{{ user.total_games }}</div><div class="stat-name">Матчей</div></div>

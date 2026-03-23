@@ -115,7 +115,8 @@ def process_all_images():
 
     # Персонажи — круглые аватары для клюшек
     characters = ['kompot', 'karamelka', 'korzhik', 'papa', 'mama',
-                  'babushka', 'dedushka', 'nuke_kompot', 'cyber_karamelka']
+                  'babushka', 'dedushka', 'nuke_kompot', 'cyber_karamelka',
+                  'lyapochka', 'bantik']
 
     for char in characters:
         for ext in ['.png', '.jpg', '.jpeg', '.webp']:

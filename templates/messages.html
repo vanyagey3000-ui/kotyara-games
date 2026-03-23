@@ -9,10 +9,11 @@
             <h2 class="section-title">Личные сообщения</h2>
             {% if partners %}
                 {% for partner in partners %}
-                <a href="{{ url_for('messages_page', user_id=partner.id) }}" class="message-partner {% if selected_user and selected_user.id == partner.id %}active{% endif %}">
-                    <strong>{{ partner.username }}</strong>
+                <div class="message-partner {% if selected_user and selected_user.id == partner.id %}active{% endif %}">
+                    <strong><a href="{{ url_for('messages_page', user_id=partner.id) }}">{{ partner.username }}</a></strong>
                     <span>ELO {{ partner.elo }} · LVL {{ partner.faceit_level }}</span>
-                </a>
+                    <small><a href="{{ url_for('profile', user_id=partner.id) }}">Открыть профиль</a></small>
+                </div>
                 {% endfor %}
             {% else %}
                 <div class="social-empty">Пока нет диалогов.</div>
@@ -26,7 +27,7 @@
                 <div class="messages-header">
                     <div>
                         <span class="section-kicker">CHAT</span>
-                        <h2 class="section-title">{{ selected_user.username }}</h2>
+                        <h2 class="section-title"><a href="{{ url_for('profile', user_id=selected_user.id) }}">{{ selected_user.username }}</a></h2>
                     </div>
                     <span class="faceit-mini-level">ELO {{ selected_user.elo }}</span>
                 </div>

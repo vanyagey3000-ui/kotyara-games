@@ -27,8 +27,8 @@
             <a href="{{ url_for('index') }}" class="hub-menu-item active">Главная</a>
             <a href="{{ url_for('shop') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Инвентарь</a>
             <a href="{{ url_for('profile') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Персонаж</a>
-            <a href="{{ url_for('chat_page') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Друзья</a>
-            <a href="{{ url_for('profile') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Рейтинг</a>
+            <a href="{{ url_for('social_page') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Друзья</a>
+            <a href="{{ url_for('tops_page') }}" class="hub-menu-item">Рейтинг</a>
             <a href="{{ url_for('shop') if current_user.is_authenticated else url_for('login') }}" class="hub-menu-item">Магазин</a>
         </nav>
     </aside>

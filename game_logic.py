@@ -13,27 +13,46 @@ class GameRoom:
     MAX_SCORE = 7
     FRICTION = 0.995
     PUCK_SPEED_LIMIT = 18
-    PADDLE_SPEED_LIMIT = 12
+    PADDLE_SPEED_LIMIT = 16
     BOUNCE_ENERGY = 0.85
     FACEOFF_SPEED = 6.2
     MIN_PUCK_SPEED = 2.1
     STALL_PUSH = 3.8
+    DISCONNECT_GRACE_SECONDS = 30
+    DISPLAY_COUNTDOWN_SECONDS = 3
+    GAME_START_SOUND_SECONDS = 3.2
+    ROUND_START_SOUND_SECONDS = 3.05
 
     def __init__(self, room_id=None):
         self.room_id = room_id or str(uuid.uuid4())[:8]
         self.players = {}
         self.state = 'waiting'
         self.score = [0, 0]
-        self.countdown = 3
+        self.countdown = self.DISPLAY_COUNTDOWN_SECONDS
+        self.countdown_duration = self.GAME_START_SOUND_SECONDS
+        self.countdown_kind = 'game'
         self.p2p_active = False  # ← добавить
         self.start_time = None
         self.last_update = time.time()
         self.game_mode = '1v1'
         self.serve_direction = random.choice([-1, 1])
         self.slow_puck_since = None
+        self.disconnect_started_at = None
+        self.disconnected_user_id = None
+        self.disconnected_player_num = None
+        self.disconnected_username = None
+        self.state_before_disconnect = None
+        self.forfeit_player_num = None
         self.goal_y_start = (self.HEIGHT - self.GOAL_WIDTH) / 2
         self.goal_y_end = (self.HEIGHT + self.GOAL_WIDTH) / 2
         self.reset_positions()
+
+    def start_countdown(self, kind='game'):
+        self.state = 'countdown'
+        self.countdown_kind = kind
+        self.countdown = self.DISPLAY_COUNTDOWN_SECONDS
+        self.countdown_duration = self.GAME_START_SOUND_SECONDS if kind == 'game' else self.ROUND_START_SOUND_SECONDS
+        self.start_time = time.time()
 
     def reset_positions(self):
         self.puck = {
@@ -59,9 +78,7 @@ class GameRoom:
             'skin': user_data.get('active_skin', 'kompot'),
         }
         if len(self.players) == 2:
-            self.state = 'countdown'
-            self.countdown = 3
-            self.start_time = time.time()
+            self.start_countdown('game')
         return player_num
 
     def remove_player(self, sid):
@@ -72,6 +89,41 @@ class GameRoom:
                 self.state = 'finished'
                 return p['number']
         return None
+
+    def mark_disconnected(self, user_id):
+        if self.state not in ('playing', 'countdown'):
+            return None
+        if self.disconnected_user_id is not None:
+            return None
+        for sid, player in self.players.items():
+            if player['user_id'] == user_id:
+                self.state_before_disconnect = self.state
+                self.state = 'disconnect_pause'
+                self.disconnect_started_at = time.time()
+                self.disconnected_user_id = user_id
+                self.disconnected_player_num = player['number']
+                self.disconnected_username = player['username']
+                return {
+                    'username': player['username'],
+                    'player_number': player['number'],
+                    'deadline_at': self.disconnect_started_at + self.DISCONNECT_GRACE_SECONDS
+                }
+        return None
+
+    def restore_disconnected(self, user_id):
+        if self.disconnected_user_id != user_id:
+            return False
+        paused_for = time.time() - (self.disconnect_started_at or time.time())
+        if self.start_time:
+            self.start_time += paused_for
+        self.state = self.state_before_disconnect or 'countdown'
+        self.disconnect_started_at = None
+        self.disconnected_user_id = None
+        self.disconnected_player_num = None
+        self.disconnected_username = None
+        self.state_before_disconnect = None
+        self.forfeit_player_num = None
+        return True
 
     def move_paddle(self, sid, x, y):
         if sid not in self.players or self.state != 'playing':
@@ -92,10 +144,16 @@ class GameRoom:
         dt = min(now - self.last_update, 0.05)
         self.last_update = now
 
+        if self.state == 'disconnect_pause':
+            if self.disconnect_started_at and now - self.disconnect_started_at >= self.DISCONNECT_GRACE_SECONDS:
+                self.forfeit_player_num = self.disconnected_player_num
+                self.state = 'finished'
+            return self.get_state()
+
         if self.state == 'countdown':
             elapsed = now - self.start_time
-            self.countdown = max(0, 3 - int(elapsed))
-            if elapsed >= 3:
+            self.countdown = max(1, self.DISPLAY_COUNTDOWN_SECONDS - int(elapsed))
+            if elapsed >= self.countdown_duration:
                 self.state = 'playing'
                 self.start_time = now
                 angle = random.uniform(-0.5, 0.5)
@@ -111,7 +169,7 @@ class GameRoom:
             p = self.paddles[num]
             dx = p['target_x'] - p['x']
             dy = p['target_y'] - p['y']
-            lerp_speed = 0.35
+            lerp_speed = 0.48
             p['vx'] = dx * lerp_speed / max(dt, 0.001)
             p['vy'] = dy * lerp_speed / max(dt, 0.001)
             speed = math.sqrt(p['vx'] ** 2 + p['vy'] ** 2)
@@ -176,9 +234,7 @@ class GameRoom:
                     self.state = 'finished'
                 else:
                     self.reset_positions()
-                    self.state = 'countdown'
-                    self.countdown = 3
-                    self.start_time = time.time()
+                    self.start_countdown('round')
                 return self.get_state()
 
             if puck['x'] - pr <= 0:
@@ -231,6 +287,9 @@ class GameRoom:
                 puck['vy'] += pad['vy'] * 0.016 * 0.75
 
     def get_state(self):
+        elapsed = round(time.time() - self.start_time, 1) if self.start_time else 0
+        if self.state == 'disconnect_pause' and self.disconnect_started_at:
+            elapsed = round(max(0, elapsed - (time.time() - self.disconnect_started_at)), 1)
         players_info = {}
         for sid, p in self.players.items():
             players_info[str(p['number'])] = {
@@ -243,6 +302,7 @@ class GameRoom:
             'state': self.state,
             'score': self.score,
             'countdown': self.countdown,
+            'countdown_kind': self.countdown_kind,
             'puck': {
                 'x': round(self.puck['x'], 1),
                 'y': round(self.puck['y'], 1),
@@ -266,7 +326,15 @@ class GameRoom:
             'goal_y_start': self.goal_y_start,
             'goal_y_end': self.goal_y_end,
             'max_score': self.MAX_SCORE,
-            'elapsed': round(time.time() - self.start_time, 1) if self.start_time else 0
+            'disconnect': {
+                'active': self.state == 'disconnect_pause' and self.disconnected_user_id is not None,
+                'username': self.disconnected_username,
+                'player_number': self.disconnected_player_num,
+                'seconds_left': max(0, int(math.ceil(
+                    self.DISCONNECT_GRACE_SECONDS - (time.time() - self.disconnect_started_at)
+                ))) if self.disconnect_started_at else 0
+            },
+            'elapsed': elapsed
         }
 
     def get_winner(self):
