@@ -1,5 +1,10 @@
 import os
 import time
+
+# Railway MySQL can fail to resolve through eventlet greendns on Python 3.12.
+# Disable greendns before importing eventlet so standard DNS resolution is used.
+os.environ.setdefault('EVENTLET_NO_GREENDNS', 'yes')
+
 import eventlet
 eventlet.monkey_patch()
 
