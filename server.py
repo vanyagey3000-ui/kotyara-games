@@ -348,6 +348,11 @@ def rules_page():
     return render_template('rules.html')
 
 
+@app.route('/network-guide')
+def network_guide_page():
+    return render_template('network_guide.html')
+
+
 @app.route(ADMIN_PANEL_PATH, methods=['GET', 'POST'])
 def admin_panel():
     unlocked = _admin_unlocked()

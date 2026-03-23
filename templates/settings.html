@@ -62,6 +62,18 @@
             </label>
         </div>
 
+        <section class="surface-card network-guide-card">
+            <span class="section-kicker">NETWORK GUIDE</span>
+            <h2 class="section-title">P2P и WebSocket без путаницы</h2>
+            <p class="profile-member">
+                Открой отдельную страницу с полным гайдом: как в этой игре работает P2P, когда лучше переключаться на WebSocket,
+                может ли VPN мешать матчу, что реально помогает соединению и каких действий лучше избегать.
+            </p>
+            <div class="hero-actions">
+                <a href="{{ url_for('network_guide_page') }}" class="btn btn-primary">Открыть гайд</a>
+            </div>
+        </section>
+
         <div class="settings-forms-grid">
             <form method="POST" class="auth-form">
                 <input type="hidden" name="action" value="change_username">

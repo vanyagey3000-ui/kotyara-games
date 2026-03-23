@@ -29,6 +29,7 @@ var lastFrameAt = performance.now();
 var lastPuckPacketAt = 0;
 var renderPuckVX = 0;
 var renderPuckVY = 0;
+var lastLocalPuckTouchAt = 0;
 var touchActive = false;
 var lastTouchAt = 0;
 var announcementHideTimer = null;
@@ -540,54 +541,72 @@ function applyLocalPuckResponse(frameNow, dt) {
 
     var padVX = myX - lastMyX;
     var padVY = myY - lastMyY;
+    var startX = lastMyX;
+    var startY = lastMyY;
     lastMyX = myX;
     lastMyY = myY;
 
-    var dx = drawPuck.x - myX;
-    var dy = drawPuck.y - myY;
-    var dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-    var minDist = PR + PKR + 4;
-    var padSpeed = Math.sqrt(padVX * padVX + padVY * padVY);
-    var puckSpeed = Math.sqrt(serverPuck.vx * serverPuck.vx + serverPuck.vy * serverPuck.vy);
-    var approachDot = dx * serverPuck.vx + dy * serverPuck.vy;
+    var segDX = myX - startX;
+    var segDY = myY - startY;
+    var segLenSq = segDX * segDX + segDY * segDY;
+    var t = 1;
+    if (segLenSq > 0.0001) {
+        t = ((drawPuck.x - startX) * segDX + (drawPuck.y - startY) * segDY) / segLenSq;
+        t = clamp(t, 0, 1);
+    }
 
-    if (dist < minDist && (approachDot < 0 || padSpeed > 1.2)) {
+    var closestX = startX + segDX * t;
+    var closestY = startY + segDY * t;
+    var dx = drawPuck.x - closestX;
+    var dy = drawPuck.y - closestY;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+    var minDist = PR + PKR + 7;
+    var padSpeed = Math.sqrt(padVX * padVX + padVY * padVY);
+    var puckSpeed = Math.sqrt(renderPuckVX * renderPuckVX + renderPuckVY * renderPuckVY);
+    var approachDot = dx * renderPuckVX + dy * renderPuckVY;
+
+    if (dist < minDist && (approachDot < 0 || padSpeed > 0.9 || segLenSq > 16)) {
         var nx = dx / dist;
         var ny = dy / dist;
-        drawPuck.x = myX + nx * minDist;
-        drawPuck.y = myY + ny * minDist;
+        drawPuck.x = closestX + nx * minDist;
+        drawPuck.y = closestY + ny * minDist;
 
-        var boost = Math.max(2.4, padSpeed * 0.9 + puckSpeed * 0.35);
-        serverPuck.vx = nx * boost + padVX * 0.45;
-        serverPuck.vy = ny * boost + padVY * 0.45;
-        renderPuckVX = serverPuck.vx;
-        renderPuckVY = serverPuck.vy;
-        serverPuck.receivedAt = frameNow - dt * 350;
+        var boost = Math.max(3.1, padSpeed * 1.05 + puckSpeed * 0.34);
+        renderPuckVX = nx * boost + padVX * 0.62;
+        renderPuckVY = ny * boost + padVY * 0.62;
+        serverPuck.vx = renderPuckVX;
+        serverPuck.vy = renderPuckVY;
+        serverPuck.receivedAt = frameNow - dt * 420;
+        lastLocalPuckTouchAt = frameNow;
 
-        drawPuck.x += serverPuck.vx * 0.28;
-        drawPuck.y += serverPuck.vy * 0.28;
+        drawPuck.x += renderPuckVX * 0.24;
+        drawPuck.y += renderPuckVY * 0.24;
         playBounceSound();
     }
 }
 
-function applyLocalWallResponse() {
+function applyLocalWallResponse(frameNow) {
     if (drawPuck.y - PKR < 0) {
         drawPuck.y = PKR;
         renderPuckVY = Math.abs(renderPuckVY) * 0.86;
+        lastLocalPuckTouchAt = frameNow;
         playBounceSound();
     } else if (drawPuck.y + PKR > FH) {
         drawPuck.y = FH - PKR;
         renderPuckVY = -Math.abs(renderPuckVY) * 0.86;
+        lastLocalPuckTouchAt = frameNow;
         playBounceSound();
     }
 
     if (drawPuck.x - PKR < 0 && !(GY1 < drawPuck.y && drawPuck.y < GY2)) {
         drawPuck.x = PKR;
         renderPuckVX = Math.abs(renderPuckVX) * 0.86;
+        lastLocalPuckTouchAt = frameNow;
         playBounceSound();
     } else if (drawPuck.x + PKR > FW && !(GY1 < drawPuck.y && drawPuck.y < GY2)) {
         drawPuck.x = FW - PKR;
         renderPuckVX = -Math.abs(renderPuckVX) * 0.86;
+        lastLocalPuckTouchAt = frameNow;
         playBounceSound();
     }
 }
@@ -631,11 +650,17 @@ function update() {
         }
     }
 
-    var packetAge = Math.min((frameNow - serverPuck.receivedAt) / 1000, 0.18);
+    // When server packets arrive very late, trust local puck motion more than stale snapshots.
+    var realPacketAge = (frameNow - serverPuck.receivedAt) / 1000;
+    var packetAge = Math.min(realPacketAge, 0.18);
     var packetFrames = Math.min((serverPuck.packetGap || 16) / 16.6667, 4);
     var predictFactor = 1.35 + packetFrames * 0.33;
-    renderPuckVX = lerp(renderPuckVX, serverPuck.vx, packetAge > 0.1 ? 0.09 : 0.2);
-    renderPuckVY = lerp(renderPuckVY, serverPuck.vy, packetAge > 0.1 ? 0.09 : 0.2);
+    var latencyShield = clamp((realPacketAge - 0.05) / 0.3, 0, 1);
+    var recentLocalTouch = (frameNow - lastLocalPuckTouchAt) < 950;
+    var localControl = recentLocalTouch ? Math.max(latencyShield, 0.82) : Math.max(0.18, latencyShield * 0.92);
+    var serverVelocityBlend = recentLocalTouch ? 0.015 : (packetAge > 0.08 ? 0.06 : 0.14);
+    renderPuckVX = lerp(renderPuckVX, serverPuck.vx, serverVelocityBlend * (1 - latencyShield * 0.85));
+    renderPuckVY = lerp(renderPuckVY, serverPuck.vy, serverVelocityBlend * (1 - latencyShield * 0.85));
     var puckTargetX = serverPuck.x + serverPuck.vx * packetAge * 60 * predictFactor;
     var puckTargetY = serverPuck.y + serverPuck.vy * packetAge * 60 * predictFactor;
     var puckGap = Math.sqrt(Math.pow(puckTargetX - drawPuck.x, 2) + Math.pow(puckTargetY - drawPuck.y, 2));
@@ -644,20 +669,23 @@ function update() {
         drawPuck.x = lerp(drawPuck.x, puck.x, 0.45);
         drawPuck.y = lerp(drawPuck.y, puck.y, 0.45);
     } else {
-        drawPuck.x = lerp(drawPuck.x, puckTargetX, puckGap > 90 ? 0.38 : 0.24);
-        drawPuck.y = lerp(drawPuck.y, puckTargetY, puckGap > 90 ? 0.38 : 0.24);
-        if (packetAge > 0.1) {
-            drawPuck.x += renderPuckVX * dt * 60 * 0.38;
-            drawPuck.y += renderPuckVY * dt * 60 * 0.38;
+        var serverPull = (puckGap > 90 ? 0.24 : 0.14) * (1 - localControl);
+        if (serverPull > 0.001) {
+            drawPuck.x = lerp(drawPuck.x, puckTargetX, serverPull);
+            drawPuck.y = lerp(drawPuck.y, puckTargetY, serverPull);
         }
-        if (packetAge > 0.16) {
-            drawPuck.x += renderPuckVX * dt * 60 * 0.55;
-            drawPuck.y += renderPuckVY * dt * 60 * 0.55;
-            renderPuckVX *= 0.996;
-            renderPuckVY *= 0.996;
+
+        var localDrift = 0.22 + localControl * 1.06;
+        drawPuck.x += renderPuckVX * dt * 60 * localDrift;
+        drawPuck.y += renderPuckVY * dt * 60 * localDrift;
+
+        if (packetAge > 0.1 || latencyShield > 0.2) {
+            renderPuckVX *= 0.9984 - Math.min(0.0012, latencyShield * 0.0008);
+            renderPuckVY *= 0.9984 - Math.min(0.0012, latencyShield * 0.0008);
         }
+
         applyLocalPuckResponse(frameNow, dt);
-        applyLocalWallResponse();
+        applyLocalWallResponse(frameNow);
     }
 
     drawEnemy.x = lerp(drawEnemy.x, enemyPad.x, p2pActive ? 0.7 : 0.45);
@@ -680,26 +708,35 @@ function render() {
     for (var i = 0; i < 8; i += 2) ctx.fillRect(i * sw, 0, sw, H);
     if (bgImg) { ctx.globalAlpha = 0.3; ctx.drawImage(bgImg, 0, 0, W, H); ctx.globalAlpha = 1; }
 
-    var bw = 8 * s, cr = 30 * s;
+    var pad = 6 * s;
+    var bw = 4 * s;
+    var cr = 24 * s;
+    var field = { x: pad, y: pad, w: W - pad * 2, h: H - pad * 2 };
+    var fsx = field.w / FW;
+    var fsy = field.h / FH;
+    var fs = Math.min(fsx, fsy);
+    function tx(x) { return field.x + x * fsx; }
+    function ty(y) { return field.y + y * fsy; }
+
     ctx.strokeStyle = '#3a7bd5'; ctx.lineWidth = bw;
-    rRect(ctx, bw / 2, bw / 2, W - bw, H - bw, cr); ctx.stroke();
+    rRect(ctx, field.x, field.y, field.w, field.h, cr); ctx.stroke();
     ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 2;
-    rRect(ctx, bw / 2, bw / 2, W - bw, H - bw, cr); ctx.stroke();
+    rRect(ctx, field.x, field.y, field.w, field.h, cr); ctx.stroke();
 
     ctx.strokeStyle = '#4895ef'; ctx.lineWidth = 3 * s;
-    ctx.beginPath(); ctx.moveTo(W / 2, bw); ctx.lineTo(W / 2, H - bw); ctx.stroke();
-    ctx.beginPath(); ctx.arc(W / 2, H / 2, 50 * s, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(W / 2, H / 2, 5 * s, 0, Math.PI * 2); ctx.fillStyle = '#4895ef'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx(FW / 2), field.y + bw); ctx.lineTo(tx(FW / 2), field.y + field.h - bw); ctx.stroke();
+    ctx.beginPath(); ctx.arc(tx(FW / 2), ty(FH / 2), 50 * fs, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(tx(FW / 2), ty(FH / 2), 5 * fs, 0, Math.PI * 2); ctx.fillStyle = '#4895ef'; ctx.fill();
 
-    var gy1 = GY1 * sy, gy2 = GY2 * sy, gw = 14 * sx;
-    drawGoalNet(0, gy1, gw, gy2 - gy1, '#e63946', s);
-    drawGoalNet(W - gw, gy1, gw, gy2 - gy1, '#4895ef', s);
+    var gy1 = ty(GY1), gy2 = ty(GY2), gw = 10 * fs;
+    drawGoalNet(field.x, gy1, gw, gy2 - gy1, '#e63946', fs);
+    drawGoalNet(field.x + field.w - gw, gy1, gw, gy2 - gy1, '#4895ef', fs);
 
     var fo = [[FW * .2, FH * .3], [FW * .2, FH * .7], [FW * .8, FH * .3], [FW * .8, FH * .7]];
     for (var fi = 0; fi < fo.length; fi++) {
-        var fx = fo[fi][0] * sx, fy = fo[fi][1] * sy, fr = 18 * s;
+        var fx = tx(fo[fi][0]), fy = ty(fo[fi][1]), fr = 18 * fs;
         ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2);
-        ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2 * s; ctx.stroke();
+        ctx.strokeStyle = '#e63946'; ctx.lineWidth = 2 * fs; ctx.stroke();
         ctx.beginPath(); ctx.moveTo(fx - fr * .5, fy - fr * .5); ctx.lineTo(fx + fr * .5, fy + fr * .5);
         ctx.moveTo(fx + fr * .5, fy - fr * .5); ctx.lineTo(fx - fr * .5, fy + fr * .5); ctx.stroke();
     }
@@ -707,12 +744,12 @@ function render() {
     if (goalFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (goalFlash / 40) + ')'; ctx.fillRect(0, 0, W, H); }
 
     for (var ti = 1; ti < trail.length; ti++) {
-        var ta = (ti / trail.length) * 0.2, tr2 = (ti / trail.length) * PKR * s * 0.5;
-        ctx.beginPath(); ctx.arc(trail[ti].x * sx, trail[ti].y * sy, tr2, 0, Math.PI * 2);
+        var ta = (ti / trail.length) * 0.2, tr2 = (ti / trail.length) * PKR * fs * 0.5;
+        ctx.beginPath(); ctx.arc(tx(trail[ti].x), ty(trail[ti].y), tr2, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(26,26,46,' + ta + ')'; ctx.fill();
     }
 
-    var px = drawPuck.x * sx, py = drawPuck.y * sy, pr = PKR * s;
+    var px = tx(drawPuck.x), py = ty(drawPuck.y), pr = PKR * fs;
     ctx.beginPath(); ctx.arc(px + 2, py + 3, pr, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fill();
     ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fillStyle = '#1a1a2e'; ctx.fill();
     ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
@@ -720,8 +757,8 @@ function render() {
     ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fill();
 
     var myN = String(myNum), enN = myNum === 1 ? '2' : '1';
-    drawPad(drawEnemy.x * sx, drawEnemy.y * sy, PR * s, enN, false, s);
-    drawPad(myX * sx, myY * sy, PR * s, myN, true, s);
+    drawPad(tx(drawEnemy.x), ty(drawEnemy.y), PR * fs, enN, false, fs);
+    drawPad(tx(myX), ty(myY), PR * fs, myN, true, fs);
 
     ctx.fillStyle = p2pActive ? '#52b788' : '#e6b800';
     ctx.beginPath(); ctx.arc(W - 20, 20, 6, 0, Math.PI * 2); ctx.fill();

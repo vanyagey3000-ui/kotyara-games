@@ -1,0 +1,259 @@
+Hockey mode analysis
+Path: C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey
+Date: 2026-03-23
+
+Important limitation
+- This report does NOT remove protection and does NOT analyze protected code.
+- Everything below is based only on openly extracted resources and file structure.
+- Gameplay logic, AI rules, collision code, score conditions, timers, and exact scene assembly are described only as grounded inference from assets, names, and dimensions.
+- Because of that, this report can say "most likely" and "probably", but cannot claim exact internal implementation without code-level access.
+
+1. What was found
+
+Main hockey-related asset groups:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\ui
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio
+
+Original extracted source groups preserved inside:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\assets\hockey
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\assets\juego6
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\assets\audio_en\juego6
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\assets\audio_fr\juego6
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\assets\audio_ru\juego6
+
+Counts:
+- backgrounds: 10 files
+- images: 12 files
+- ui: 5 files
+- audio: 26 files
+- total categorized: 53 files
+
+2. Background and scene composition
+
+Files:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_fondo1.png = 1480x701
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_fondo2.jpg = 1480x261
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_campo1.png = 330x720
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_campo1b.png = 330x720
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_campo2.png = 128x720
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_campo3.png = 297x720
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_esquina.png = 256x256
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\hockey_sombra.png = 146x147
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\juego6_fondo1.png = 1480x701
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\backgrounds\juego6_fondo2.jpg = 1480x261
+
+Likely composition:
+- "fondo" files are most likely large base backdrops for the scene.
+- "campo" files are most likely rink or playfield layers placed on top of the base background.
+- The repeated height 720 in campo files strongly suggests a screen-oriented assembly for a 720px-tall layout.
+- The widths 330 + 128 + 297 = 755, which looks like segmented rink pieces rather than one flat image.
+- "campo1" and "campo1b" probably represent variant states, mirrored parts, or alternate side overlays.
+- "esquina" likely means a corner graphic used to finish rink geometry or a curved board edge.
+- "sombra" is probably a shadow sprite placed under character/paddle elements to fake depth.
+- The duplicate fondo files in both "hockey" and "juego6" suggest the hockey mode is internally tied to mini-game slot 6.
+
+Probable visual layering order:
+1. fondo1 / fondo2 as the far background
+2. campo pieces as the playable rink surface
+3. goal and goal side overlays
+4. characters and paddles
+5. puck
+6. shadow and small effect overlays
+7. stars / winner UI / button UI
+
+3. Interactive gameplay objects
+
+Core object files:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_puck.png = 64x64
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_paddle1.png = 118x118
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_paddle2.png = 118x118
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_paddle5.png = 118x118
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_paddle6.png = 118x118
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_goal.png = 36x314
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_goal1.png = 418x439
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_goal2.png = 418x439
+
+Interpretation:
+- puck.png is clearly the main moving ball/puck object.
+- paddle files strongly suggest hockey is implemented closer to "air hockey" or a simplified arcade hockey interaction than full skating simulation.
+- Equal 118x118 paddle sizes imply interchangeable skins or side-specific paddles.
+- goal1 and goal2 are likely left/right gate graphics or alternate goal states.
+- goal.png is much narrower and may be a goal marker, collision strip, net overlay, or scoring zone edge.
+
+Most likely gameplay loop:
+- Player drags or controls one paddle/striker.
+- Opponent uses another paddle/striker.
+- The puck moves physically across a bounded rink.
+- When puck crosses one side's scoring zone, the game triggers goal audio and score update.
+- The mode probably contains simplified rebounds from rink borders and goal openings.
+
+4. Character presentation
+
+Character files:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_personaje1.png = 294x220
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_personaje2.png = 257x224
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_personaje5.png = 289x249
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\images\hockey_personaje6.png = 283x239
+
+Interpretation:
+- "personaje" means character.
+- These are probably decorative character portraits or linked to selectable players/sides.
+- Their sizes are much larger than the puck and paddles, so they likely are not direct collision bodies.
+- Most likely use: side art, avatar overlays, winner screens, or attached visual bodies while the actual collision body is the paddle sprite.
+
+5. UI and state feedback
+
+UI files:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\ui\hockey_boton.png = 743x210
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\ui\hockey_star00.png = 67x61
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\ui\hockey_star02.png = 67x61
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\ui\hockey_winner1.png = 736x700
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\ui\hockey_winner2.png = 736x700
+
+Interpretation:
+- boton.png is likely a large tap/continue/replay button.
+- star00 and star02 imply reward grading or completion result.
+- winner1 and winner2 strongly suggest distinct result screens or winner-state overlays for two competitors/sides.
+- This implies the mini-game likely has explicit win/loss endings, not endless play.
+
+6. Audio structure
+
+Global effect and mode audio:
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\hockey_hit1.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\hockey_hit2.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\hockey_hit3.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\hockey_hit4.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\juego6_hockey.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\juego6_intro_2_silbato_patines.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\juego6_marcador.mp3
+- C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\juego6_silbato.mp3
+
+Localized voice/audio groups:
+- EN:
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_en_animar1.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_en_animar2.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_en_fin_1_everyone.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_en_gol_azul.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_en_gol_rojo.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_en_intro_1_narrador.mp3
+- FR:
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_fr_animar1.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_fr_animar2.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_fr_fin_1_everyone.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_fr_gol_azul.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_fr_gol_rojo.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_fr_intro_1_narrador.mp3
+- RU:
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_ru_animar1.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_ru_animar2.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_ru_fin_1_everyone.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_ru_gol_azul.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_ru_gol_rojo.mp3
+  - C:\Users\blackkkent\Desktop\deobf\deobfcuation\hockey\audio\audio_ru_intro_1_narrador.mp3
+
+Audio-based inference:
+- "intro_1_narrador" indicates a narrated intro at start.
+- "silbato" and "silbato_patines" suggest whistle/skating intro cues.
+- "gol_azul" and "gol_rojo" strongly imply two scoring sides: blue and red.
+- "marcador" likely means scoreboard or score update sound.
+- "animar" likely are encouragement voice lines played mid-match.
+- "fin_1_everyone" likely belongs to end-of-match celebration.
+- hit1-hit4 are impact sounds for puck collisions with paddle, wall, or goal area.
+
+Most likely audio event mapping:
+- intro narration at mini-game start
+- whistle or skate whistle when gameplay begins
+- hit sounds on collision
+- goal sound/voice on score event
+- scoreboard sound after score is registered
+- encouragement voice during play
+- end/winner voice line after result
+
+7. What can be inferred about AI
+
+Exact AI behavior cannot be confirmed from assets alone.
+
+What can be inferred safely:
+- There are explicit winner assets for two outcomes, which implies the game probably supports opponent behavior rather than only free play.
+- The presence of red/blue goal audio suggests two sides with independent scoring states.
+- The paddle-based asset design strongly suggests simple arcade AI, probably one of these:
+  - follow puck on one axis
+  - clamp movement to one half of the field
+  - intercept puck when it enters a zone
+  - return to a default position when puck is far away
+- Because there are no visible assets for advanced tactical states, the AI is likely lightweight and position-based rather than animation-heavy.
+
+What cannot be confirmed without code:
+- whether AI predicts puck trajectory
+- whether AI difficulty scales
+- movement speed caps
+- collision response formula
+- exact goal detection zones
+- score limit to win
+- whether there is rubber-banding or assist logic
+
+8. How the hockey mode is probably organized internally
+
+Strongest file structure clue:
+- Hockey is represented by a dedicated art folder "assets\hockey"
+- At the same time, shared runtime files are under "assets\juego6"
+- Voice lines for the same mode are in "assets\audio_[lang]\juego6"
+
+Best explanation:
+- The app probably indexes mini-games numerically.
+- Hockey appears to map to mini-game ID or slot "juego6".
+- The runtime likely loads:
+  - scene-specific graphics from assets\hockey
+  - shared scene/audio setup from assets\juego6
+  - language-specific voice from assets\audio_[lang]\juego6
+
+Possible loading sequence:
+1. select mini-game 6
+2. load common fondo / scene base
+3. load hockey object textures
+4. load localized intro and gameplay voice lines
+5. start intro state
+6. switch to active play state
+7. update score and play winner state
+
+9. Best reconstruction of the gameplay flow
+
+Probable state machine:
+- Intro state
+  - narrator line
+  - whistle/skate intro sound
+  - initial scene shown
+- Match state
+  - puck becomes active
+  - player and opponent paddles move
+  - collision sounds play
+  - score events trigger blue/red goal audio
+- Score feedback state
+  - scoreboard or marker sound
+  - puck reset to start position
+- End state
+  - winner1 or winner2 asset shown
+  - stars shown
+  - continue/replay button shown
+  - final voice line plays
+
+10. What this report does NOT prove
+
+This report does not prove:
+- exact code structure
+- exact coordinate system
+- exact hitboxes
+- exact AI implementation
+- exact renderer or engine logic
+- whether physics are real or scripted
+
+11. Most useful next safe step
+
+Without removing protection, the safest next step would be:
+- document asset-to-role mapping even more precisely
+- inspect the hockey images visually and label each one
+- generate a CSV or TXT index with category, dimensions, likely purpose, and original source path
+
+End of report

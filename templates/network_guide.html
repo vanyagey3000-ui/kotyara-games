@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}P2P Guide | KotayraGames{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card settings-card-wide guide-shell">
+        <div class="auth-header">
+            <span class="auth-icon">N</span>
+            <h1>P2P и WebSocket Guide</h1>
+            <p>Быстрый и полный разбор того, как в KotayraGames работает сетевой матч, когда лучше использовать P2P, когда выгоднее WebSocket и как на это влияет VPN.</p>
+        </div>
+
+        <div class="guide-hero-grid">
+            <section class="surface-card guide-highlight guide-highlight-p2p">
+                <span class="section-kicker">P2P</span>
+                <h2 class="section-title">Самый быстрый отклик</h2>
+                <p class="profile-member">
+                    В этой игре P2P нужен для более быстрого обмена игровыми движениями между браузерами игроков. При этом сервер все равно
+                    остается важной частью матча и держит синхронизацию состояния как резерв и контроль.
+                </p>
+            </section>
+
+            <section class="surface-card guide-highlight guide-highlight-ws">
+                <span class="section-kicker">WEBSOCKET</span>
+                <h2 class="section-title">Самый стабильный запасной режим</h2>
+                <p class="profile-member">
+                    Если прямое соединение не выходит, WebSocket идет через сервер. Обычно это чуть тяжелее по задержке, зато часто надежнее в
+                    сложных сетях, офисах, общежитиях, мобильных сетях и при некоторых VPN.
+                </p>
+            </section>
+        </div>
+
+        <div class="guide-grid">
+            <section class="surface-card">
+                <span class="section-kicker">QUICK RULES</span>
+                <h2 class="section-title">Когда что выбирать</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>P2P лучше включать дома на обычном интернете.</strong><span>Особенно если у тебя нормальный Wi‑Fi или кабель, нет жестких корпоративных ограничений и не запущено ничего, что режет UDP или WebRTC.</span></div>
+                    <div class="feature-item"><strong>WebSocket лучше включать, если P2P ведет себя нестабильно.</strong><span>Например, матч долго соединяется, часто переподключается, пинг прыгает, или прямой канал между игроками вообще не поднимается.</span></div>
+                    <div class="feature-item"><strong>Если сомневаешься, начни с P2P.</strong><span>Если чувствуешь проблемы именно по сети, а не по FPS, сразу переключайся на WebSocket и перепроверь матч еще раз.</span></div>
+                </div>
+            </section>
+
+            <section class="surface-card">
+                <span class="section-kicker">VPN</span>
+                <h2 class="section-title">Мешает ли VPN?</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>Да, VPN может мешать P2P.</strong><span>Он может менять маршрут, добавлять лишнюю задержку, блокировать или ухудшать прямой обмен, а иногда заставляет соединение идти дольше или нестабильно подниматься.</span></div>
+                    <div class="feature-item"><strong>Для WebSocket VPN обычно менее критичен.</strong><span>Матч все равно идет через сервер, поэтому WebSocket часто легче переживает VPN, чем прямое P2P-соединение, хотя общий пинг все равно может стать выше.</span></div>
+                    <div class="feature-item"><strong>Если играешь через VPN и есть проблемы, самый быстрый тест:</strong><span>Выключи VPN, перезайди в матч и сравни. Если без VPN стало лучше, для этой сети лучше оставаться без него или играть через WebSocket.</span></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="guide-grid">
+            <section class="surface-card">
+                <span class="section-kicker">P2P DO</span>
+                <h2 class="section-title">Что делать для хорошего P2P</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>Держи одно стабильное подключение.</strong><span>Лучше не переключаться между Wi‑Fi, мобильной сетью, репитером и хот-спотом посреди матчей.</span></div>
+                    <div class="feature-item"><strong>По возможности используй 5 GHz Wi‑Fi или кабель.</strong><span>Чем чище и стабильнее канал, тем меньше лагов и срывов при прямом соединении.</span></div>
+                    <div class="feature-item"><strong>Закрой фоновые загрузки.</strong><span>Торренты, облачные синхронизации, обновления игр и большие стримы могут съедать канал и мешать стабильности пакетов.</span></div>
+                    <div class="feature-item"><strong>Оставь одну вкладку игры.</strong><span>Не запускай несколько матчевых вкладок одновременно и не дублируй игру в разных браузерах.</span></div>
+                    <div class="feature-item"><strong>Если видишь, что P2P не поднялся, не мучай матч.</strong><span>Переключись на WebSocket в настройках и зайди снова. Это лучше, чем держать нестабильный прямой канал.</span></div>
+                </div>
+            </section>
+
+            <section class="surface-card">
+                <span class="section-kicker">P2P DON'T</span>
+                <h2 class="section-title">Чего лучше не делать</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>Не совмещай слабый Wi‑Fi, VPN и мобильный хот-спот.</strong><span>Такой набор чаще всего ломает прямой путь и добавляет нестабильность.</span></div>
+                    <div class="feature-item"><strong>Не включай жесткий battery saver во время матча.</strong><span>На телефонах и ноутбуках он может резать фоновые соединения, таймеры и сетевую активность браузера.</span></div>
+                    <div class="feature-item"><strong>Не сворачивай игру надолго во время катки.</strong><span>Некоторые браузеры и мобильные системы в фоне сильнее душат сеть и могут сорвать переподключение.</span></div>
+                    <div class="feature-item"><strong>Не считай, что любая проблема сети решается только P2P.</strong><span>Иногда как раз WebSocket даст более чистый матч, если сеть сложная или сильно фильтруется.</span></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="guide-grid">
+            <section class="surface-card">
+                <span class="section-kicker">WEBSOCKET DO</span>
+                <h2 class="section-title">Когда WebSocket реально лучше</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>Если ты в офисе, школе, общаге или публичной сети.</strong><span>В таких местах прямые соединения между игроками режутся чаще, чем обычный серверный трафик.</span></div>
+                    <div class="feature-item"><strong>Если играешь через VPN и P2P нестабилен.</strong><span>WebSocket обычно спокойнее переносит такой сценарий.</span></div>
+                    <div class="feature-item"><strong>Если у тебя часто NAT или провайдерные ограничения.</strong><span>WebSocket поможет избежать части проблем с прямым браузерным соединением.</span></div>
+                    <div class="feature-item"><strong>Если важнее ровная стабильность, чем минимальный отклик.</strong><span>WebSocket нередко оказывается самым предсказуемым вариантом.</span></div>
+                </div>
+            </section>
+
+            <section class="surface-card">
+                <span class="section-kicker">FAQ</span>
+                <h2 class="section-title">Частые вопросы</h2>
+                <div class="feature-list">
+                    <div class="feature-item"><strong>Если у меня хороший интернет, P2P всегда лучше?</strong><span>Не всегда. Важно не только качество интернета, но и тип сети, NAT, VPN, маршрутизация и ограничения браузера или роутера.</span></div>
+                    <div class="feature-item"><strong>Если высокий пинг, виноват только режим соединения?</strong><span>Нет. На лаг также влияют FPS, фоновые загрузки, нестабильный Wi‑Fi, расстояние до сервера и путь трафика через провайдера.</span></div>
+                    <div class="feature-item"><strong>Можно ли держать VPN и просто перейти на WebSocket?</strong><span>Да, это нормальный сценарий. Но если пинг все равно высокий, для чистоты теста лучше сравнить матч еще и без VPN.</span></div>
+                    <div class="feature-item"><strong>Что делать первым делом, если матч идет плохо?</strong><span>1. Закрыть лишние загрузки. 2. Проверить звук и вкладку. 3. Если стоял P2P и есть сетевые проблемы, попробовать WebSocket. 4. Если был VPN, протестировать без него.</span></div>
+                </div>
+            </section>
+        </div>
+
+        <section class="surface-card guide-note">
+            <span class="section-kicker">BEST PRACTICE</span>
+            <h2 class="section-title">Самая быстрая схема проверки</h2>
+            <div class="feature-list">
+                <div class="feature-item"><strong>1. Дома и без VPN:</strong><span>ставь P2P и проверяй матч.</span></div>
+                <div class="feature-item"><strong>2. Если есть нестабильность:</strong><span>переключайся на WebSocket и проверяй снова.</span></div>
+                <div class="feature-item"><strong>3. Если сидишь через VPN:</strong><span>сравни матч с VPN и без VPN, потому что именно он часто ломает прямой путь.</span></div>
+                <div class="feature-item"><strong>4. Если сеть сложная:</strong><span>офис, кампус, публичный Wi‑Fi, мобильная сеть — чаще выгоднее сразу уходить в WebSocket.</span></div>
+            </div>
+            <div class="hero-actions">
+                <a href="{{ url_for('settings') }}" class="btn btn-primary">Назад в настройки</a>
+                <a href="{{ url_for('lobby') }}" class="btn btn-secondary">Вернуться в лобби</a>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
