@@ -6,4 +6,4 @@ werkzeug==3.0.1
 eventlet==0.35.1
 Pillow==10.4.0
 psycopg2-binary==2.9.10
-PyMySQL==1.1.1
+PyMySQL[rsa]==1.1.1
