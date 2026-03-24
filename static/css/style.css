@@ -3689,3 +3689,400 @@ select:focus {
         grid-template-columns: 1fr;
     }
 }
+
+.hub-actions {
+    background:
+        radial-gradient(circle at top right, rgba(255, 116, 32, 0.18), transparent 24%),
+        radial-gradient(circle at bottom left, rgba(68, 149, 239, 0.12), transparent 26%),
+        linear-gradient(180deg, rgba(11, 15, 21, 0.98), rgba(6, 9, 13, 0.95));
+}
+
+.hub-wallet,
+.hub-settings-btn,
+.hub-select-card {
+    background: linear-gradient(180deg, rgba(40, 51, 67, 0.98), rgba(16, 22, 31, 0.94));
+    border-color: rgba(145, 173, 205, 0.18);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 14px 28px rgba(0, 0, 0, 0.18);
+    color: #eef6ff;
+}
+
+.hub-settings-btn,
+.hub-select-card,
+.hub-stack-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.hub-settings-btn::before,
+.hub-select-card::before,
+.hub-stack-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 4px;
+    border-radius: 0 8px 8px 0;
+    background: linear-gradient(180deg, #ff8f2a, #ff5a0a);
+    box-shadow: 0 0 18px rgba(255, 122, 35, 0.38);
+}
+
+.hub-settings-btn,
+.hub-select-card {
+    justify-content: flex-start;
+    padding: 0 18px 0 24px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.hub-settings-btn:hover,
+.hub-select-card:hover {
+    border-color: rgba(255, 132, 40, 0.38);
+    transform: translateY(-1px);
+}
+
+.hub-stack-btn {
+    min-height: 82px;
+    justify-content: flex-start;
+    padding: 0 24px 0 30px;
+    background: linear-gradient(180deg, rgba(38, 49, 65, 0.98), rgba(15, 21, 29, 0.94));
+    border-color: rgba(138, 166, 198, 0.16);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 18px 30px rgba(0, 0, 0, 0.24);
+    text-shadow: none;
+}
+
+.hub-stack-btn::after {
+    content: '›';
+    margin-left: auto;
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.52);
+}
+
+.hub-stack-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 136, 54, 0.42);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 20px 34px rgba(255, 91, 10, 0.14);
+}
+
+.hub-stack-btn-primary {
+    justify-content: center;
+    padding: 0 24px;
+    border-radius: 22px;
+}
+
+.hub-stack-btn-primary::before,
+.hub-stack-btn-primary::after {
+    display: none;
+}
+
+.hub-select-card.active {
+    background: linear-gradient(180deg, rgba(51, 63, 79, 0.98), rgba(20, 27, 37, 0.95));
+    border-color: rgba(255, 136, 49, 0.46);
+    color: #fff0e4;
+    box-shadow:
+        inset 4px 0 0 #ff7420,
+        0 14px 28px rgba(255, 95, 20, 0.12);
+}
+
+.survey-reminder-banner {
+    border-bottom: 1px solid rgba(255, 123, 43, 0.24);
+    background:
+        linear-gradient(90deg, rgba(255, 108, 29, 0.26), rgba(35, 45, 58, 0.96) 36%, rgba(15, 20, 28, 0.98));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 18px 36px rgba(0, 0, 0, 0.18);
+}
+
+.survey-reminder-content {
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 0;
+}
+
+.survey-reminder-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.survey-reminder-copy strong {
+    font-family: 'Barlow Condensed', 'Manrope', sans-serif;
+    font-size: 1.35rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #fff7ef;
+}
+
+.survey-reminder-copy span {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.98rem;
+}
+
+.survey-reminder-btn {
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #ff8f2a, #ff5c0d);
+    color: #fff;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 16px 28px rgba(255, 89, 10, 0.28);
+}
+
+.survey-reminder-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+.polls-shell {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: grid;
+    gap: 22px;
+}
+
+.polls-hero,
+.polls-card {
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        radial-gradient(circle at top right, rgba(255, 114, 24, 0.18), transparent 28%),
+        linear-gradient(180deg, rgba(18, 23, 31, 0.98), rgba(8, 11, 16, 0.96));
+    box-shadow:
+        var(--shadow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.polls-hero {
+    padding: 30px 32px;
+}
+
+.polls-lead,
+.polls-note,
+.polls-deadline {
+    max-width: 900px;
+    color: rgba(255, 255, 255, 0.84);
+}
+
+.polls-note {
+    margin-top: 10px;
+}
+
+.polls-deadline {
+    margin-top: 18px;
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    padding: 0 18px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(39, 50, 66, 0.95), rgba(15, 21, 29, 0.92));
+    border: 1px solid rgba(145, 173, 205, 0.18);
+    font-weight: 800;
+}
+
+.polls-card {
+    padding: 26px;
+    display: grid;
+    gap: 22px;
+}
+
+.polls-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.poll-option-card {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(28, 34, 43, 0.98), rgba(10, 13, 18, 0.95));
+    display: grid;
+    gap: 14px;
+    text-align: left;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 18px 30px rgba(0, 0, 0, 0.24);
+}
+
+.poll-option-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 128, 44, 0.34);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 20px 34px rgba(255, 96, 18, 0.12);
+}
+
+.poll-option-card:disabled {
+    cursor: default;
+}
+
+.poll-option-card.is-selected {
+    transform: translateY(-4px);
+    border-color: rgba(255, 136, 53, 0.56);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 136, 53, 0.18),
+        0 24px 40px rgba(255, 96, 18, 0.18);
+}
+
+.poll-option-card.is-selected::after {
+    content: 'Выбрано';
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #ff8b27, #ff5b0c);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.poll-option-card.is-locked {
+    cursor: default;
+}
+
+.poll-option-index {
+    font-family: 'Orbitron', 'Manrope', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.poll-option-frame {
+    overflow: hidden;
+    border-radius: 18px;
+    aspect-ratio: 3 / 4;
+    background: #0d1118;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.poll-option-frame img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.poll-option-title {
+    font-family: 'Barlow Condensed', 'Manrope', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.poll-status-box {
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(34, 42, 56, 0.92), rgba(14, 19, 27, 0.92));
+    padding: 18px 20px;
+    display: grid;
+    gap: 8px;
+}
+
+.poll-status-box strong {
+    font-family: 'Barlow Condensed', 'Manrope', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.poll-status-box-success {
+    border-color: rgba(82, 183, 136, 0.34);
+    background:
+        radial-gradient(circle at top left, rgba(82, 183, 136, 0.16), transparent 30%),
+        linear-gradient(180deg, rgba(24, 37, 33, 0.94), rgba(12, 19, 17, 0.94));
+}
+
+.poll-submit-btn {
+    min-height: 72px;
+    width: min(100%, 360px);
+    border: 0;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #ff8b28 0%, #ff6a10 48%, #ff5200 100%);
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Manrope', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.28),
+        0 22px 36px rgba(255, 94, 13, 0.24);
+}
+
+.poll-submit-btn:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+    opacity: 0.55;
+    box-shadow: none;
+}
+
+.poll-summary-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.94rem;
+}
+
+@media (max-width: 1200px) {
+    .polls-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .survey-reminder-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .polls-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .polls-hero,
+    .polls-card {
+        padding: 20px;
+        border-radius: 22px;
+    }
+
+    .polls-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .poll-submit-btn {
+        width: 100%;
+    }
+}

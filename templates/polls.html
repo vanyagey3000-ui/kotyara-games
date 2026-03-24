@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Опросы | KotayraGames{% endblock %}
+
+{% block content %}
+<section class="polls-shell">
+    <div class="polls-hero">
+        <span class="section-kicker">COMMUNITY POLL</span>
+        <h1 class="section-title">{{ survey.title }}</h1>
+        <p class="polls-lead">{{ survey.subtitle }}</p>
+        <p class="polls-note">{{ survey.toggle_hint }}</p>
+        <div class="polls-deadline">Опрос закончиться: {{ survey.deadline_label }}</div>
+    </div>
+
+    <form method="post" class="polls-card">
+        <input type="hidden" name="option_key" id="poll-option-key" value="">
+
+        <div class="polls-grid">
+            {% for option in survey.options %}
+            <button
+                type="button"
+                class="poll-option-card{% if option.is_selected %} is-selected is-locked{% endif %}"
+                data-option-id="{{ option.id }}"
+                {% if survey.user_vote or not survey.is_open %}disabled{% endif %}
+            >
+                <span class="poll-option-index">{{ '%02d'|format(loop.index) }}</span>
+                <div class="poll-option-frame">
+                    <img src="{{ url_for('static', filename='images/opros/' ~ option.filename) }}" alt="{{ option.title }}">
+                </div>
+                <span class="poll-option-title">{{ option.title }}</span>
+            </button>
+            {% endfor %}
+        </div>
+
+        {% if survey.user_vote %}
+        <div class="poll-status-box poll-status-box-success">
+            <strong>Ваш голос уже принят.</strong>
+            <span>Мы больше не будем беспокоить вас этим опросом. Спасибо за участие.</span>
+        </div>
+        {% elif not survey.is_open %}
+        <div class="poll-status-box">
+            <strong>Опрос завершен.</strong>
+            <span>Новые голоса больше не принимаются.</span>
+        </div>
+        {% else %}
+        <div class="poll-status-box" id="poll-selection-helper">
+            <strong>{{ survey.post_select_hint }}</strong>
+            <span>{{ survey.confirm_hint }}</span>
+        </div>
+        <button type="submit" class="poll-submit-btn" id="poll-submit-btn" disabled>ГОТОВ!</button>
+        {% endif %}
+
+        <div class="poll-summary-line">
+            <span>Всего голосов: {{ survey.total_votes }}</span>
+            <span>Один аккаунт = один финальный голос</span>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if not survey.user_vote and survey.is_open %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var cards = Array.prototype.slice.call(document.querySelectorAll('[data-option-id]'));
+    var hiddenInput = document.getElementById('poll-option-key');
+    var submitBtn = document.getElementById('poll-submit-btn');
+    var helper = document.getElementById('poll-selection-helper');
+    var selectedId = '';
+
+    function syncSelection(nextId) {
+        selectedId = nextId || '';
+        hiddenInput.value = selectedId;
+        cards.forEach(function(card) {
+            card.classList.toggle('is-selected', card.dataset.optionId === selectedId);
+        });
+        submitBtn.disabled = !selectedId;
+        if (helper) {
+            if (selectedId) {
+                helper.innerHTML = '<strong>Карта выбрана.</strong><span>Если вы решились нажмите на кнопку ниже и ваш голос уже нельзя будет убрать!</span>';
+            } else {
+                helper.innerHTML = '<strong>{{ survey.post_select_hint }}</strong><span>{{ survey.confirm_hint }}</span>';
+            }
+        }
+    }
+
+    cards.forEach(function(card) {
+        card.addEventListener('click', function() {
+            syncSelection(selectedId === card.dataset.optionId ? '' : card.dataset.optionId);
+        });
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

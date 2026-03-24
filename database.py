@@ -364,6 +364,22 @@ class PlayerReport(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class SurveyVote(db.Model):
+    __tablename__ = 'survey_votes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    survey_key = db.Column(db.String(64), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    option_key = db.Column(db.String(64), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship('User', backref='survey_votes', lazy=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('survey_key', 'user_id', name='uniq_survey_vote'),
+    )
+
+
 def calculate_elo(winner_elo, loser_elo, k=32, draw=False):
     expected_w = 1 / (1 + math.pow(10, (loser_elo - winner_elo) / 400))
     expected_l = 1 / (1 + math.pow(10, (winner_elo - loser_elo) / 400))

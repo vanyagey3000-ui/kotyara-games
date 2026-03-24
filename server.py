@@ -14,11 +14,12 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import or_, and_
 from werkzeug.security import check_password_hash
+from zoneinfo import ZoneInfo
 
 from database import (
     db, User, ShopItem, UserItem, MatchHistory, ChatMessage,
     FriendRequest, Friendship, Party, PartyMember, PartyInvite,
-    DirectMessage, TeamFinderPost, SiteAnnouncement, PlayerReport,
+    DirectMessage, TeamFinderPost, SiteAnnouncement, PlayerReport, SurveyVote,
     calculate_elo, seed_shop_items
 )
 from game_logic import GameRoom
@@ -81,6 +82,17 @@ ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 8
 MATCH_BAN_SECONDS = 90
 ANNOUNCEMENT_TTL_SECONDS = 10
 APP_BOOTSTRAPPED = False
+SURVEY_TIMEZONE = ZoneInfo('Europe/Moscow')
+CURRENT_SURVEY_KEY = 'spring_map_vote_2026_03'
+CURRENT_SURVEY_DEADLINE = datetime(2026, 3, 25, 14, 0, tzinfo=SURVEY_TIMEZONE)
+CURRENT_SURVEY_DEADLINE_LABEL = '25 марта, в 14:00 по МСК.'
+CURRENT_SURVEY_OPTIONS = [
+    {'id': 'spring_map_1', 'title': 'Вариант 1', 'filename': 'poll_map_1_sakura-cove.png'},
+    {'id': 'spring_map_2', 'title': 'Вариант 2', 'filename': 'poll_map_2_mint-greenhouse.png'},
+    {'id': 'spring_map_3', 'title': 'Вариант 3', 'filename': 'poll_map_3_tulip-festival.png'},
+    {'id': 'spring_map_4', 'title': 'Вариант 4', 'filename': 'poll_map_4_meadow-picnic.png'},
+    {'id': 'spring_map_5', 'title': 'Вариант 5', 'filename': 'poll_map_5_zen-blossom.png'},
+]
 
 
 def _matchmaking_window(waited_seconds):
@@ -107,7 +119,8 @@ def inject_helpers():
     return dict(
         has_image=lambda n: has_processed_image(n),
         image_url=lambda n: get_processed_url(n),
-        active_announcement=_get_active_announcement()
+        active_announcement=_get_active_announcement(),
+        survey_notice=_get_survey_notice()
     )
 
 
@@ -243,6 +256,54 @@ def _broadcast_announcement_payload(announcement):
     }
 
 
+def _build_current_survey(user_id=None):
+    now_msk = datetime.now(timezone.utc).astimezone(SURVEY_TIMEZONE)
+    user_vote = None
+    if user_id:
+        user_vote = SurveyVote.query.filter_by(
+            survey_key=CURRENT_SURVEY_KEY,
+            user_id=user_id
+        ).first()
+
+    selected_option = user_vote.option_key if user_vote else None
+    options = []
+    for option in CURRENT_SURVEY_OPTIONS:
+        option_data = dict(option)
+        option_data['is_selected'] = option['id'] == selected_option
+        options.append(option_data)
+
+    return {
+        'key': CURRENT_SURVEY_KEY,
+        'title': 'Идет опрос о добавлении весенней карты в игру.',
+        'subtitle': 'Пожалуйста выберите 1 картинку из 5 и проголосуйте по кнопке ниже!',
+        'toggle_hint': 'Если вы хотите поменять ваш опрос, вы можете повторно нажать на карту, чтобы убрать с нее голос.',
+        'post_select_hint': 'После нажатия на карту вы можете еще обдумать.',
+        'confirm_hint': 'Если вы решились нажмите на кнопку ниже и ваш голос уже нельзя будет убрать!',
+        'deadline_label': CURRENT_SURVEY_DEADLINE_LABEL,
+        'deadline_at': CURRENT_SURVEY_DEADLINE,
+        'is_open': now_msk < CURRENT_SURVEY_DEADLINE,
+        'user_vote': user_vote,
+        'selected_option': selected_option,
+        'options': options,
+        'total_votes': SurveyVote.query.filter_by(survey_key=CURRENT_SURVEY_KEY).count()
+    }
+
+
+def _get_survey_notice():
+    if not current_user.is_authenticated:
+        return None
+
+    survey = _build_current_survey(current_user.id)
+    if not survey['is_open'] or survey['user_vote']:
+        return None
+
+    return {
+        'title': 'Опрос весенней карты',
+        'message': f'Выберите 1 из 5 картинок и проголосуйте до {survey["deadline_label"]}',
+        'deadline_label': survey['deadline_label']
+    }
+
+
 def _delete_user_account(user):
     if user.id in user_id_to_room and user_id_to_room[user.id] in game_rooms:
         raise ValueError('Нельзя удалить игрока во время активного матча')
@@ -351,6 +412,46 @@ def rules_page():
 @app.route('/network-guide')
 def network_guide_page():
     return render_template('network_guide.html')
+
+
+@app.route('/polls', methods=['GET', 'POST'])
+@login_required
+def polls_page():
+    survey = _build_current_survey(current_user.id)
+
+    if request.method == 'POST':
+        if not survey['is_open']:
+            flash('Опрос уже завершен', 'error')
+            return redirect(url_for('polls_page'))
+
+        if survey['user_vote']:
+            flash('Ваш голос уже зафиксирован и больше не изменяется', 'error')
+            return redirect(url_for('polls_page'))
+
+        option_key = request.form.get('option_key', '').strip()
+        valid_option_ids = {option['id'] for option in CURRENT_SURVEY_OPTIONS}
+        if option_key not in valid_option_ids:
+            flash('Сначала выберите одну картинку', 'error')
+            return redirect(url_for('polls_page'))
+
+        existing_vote = SurveyVote.query.filter_by(
+            survey_key=CURRENT_SURVEY_KEY,
+            user_id=current_user.id
+        ).first()
+        if existing_vote:
+            flash('Ваш голос уже был принят ранее', 'error')
+            return redirect(url_for('polls_page'))
+
+        db.session.add(SurveyVote(
+            survey_key=CURRENT_SURVEY_KEY,
+            user_id=current_user.id,
+            option_key=option_key
+        ))
+        db.session.commit()
+        flash('Голос принят. Спасибо за участие в опросе!', 'success')
+        return redirect(url_for('polls_page'))
+
+    return render_template('polls.html', survey=survey)
 
 
 @app.route(ADMIN_PANEL_PATH, methods=['GET', 'POST'])

@@ -40,6 +40,14 @@ var currentRoomState = 'waiting';
 
 var imgs = {};
 var bgImg = null;
+var GOAL_SIDE_IMAGES = {
+    '1': '/static/testimage/images/hockey_goal1.png',
+    '2': '/static/testimage/images/hockey_goal2.png'
+};
+var WINNER_SIDE_IMAGES = {
+    '1': '/static/testimage/ui/hockey_winner1.png',
+    '2': '/static/testimage/ui/hockey_winner2.png'
+};
 
 function ldImg(k, u) {
     if (!u) return;
@@ -52,6 +60,8 @@ function ldImg(k, u) {
 if (typeof SKIN_IMAGES !== 'undefined' && SKIN_IMAGES) {
     for (var id in SKIN_IMAGES) ldImg(id + '_paddle', SKIN_IMAGES[id]);
 }
+for (var goalSide in GOAL_SIDE_IMAGES) ldImg('goal_side_' + goalSide, GOAL_SIDE_IMAGES[goalSide]);
+for (var winnerSide in WINNER_SIDE_IMAGES) ldImg('winner_side_' + winnerSide, WINNER_SIDE_IMAGES[winnerSide]);
 
 if (typeof BG_IMAGE_URL !== 'undefined' && BG_IMAGE_URL) {
     var bi = new Image();
@@ -313,14 +323,16 @@ function applyCelebrationSkin(panelId, imageId, fallbackId, skin, username) {
     fallback.textContent = (username || 'Игрок').charAt(0) || 'K';
 }
 
-function showGoalCelebration(player) {
+function showGoalCelebration(player, sideKey) {
     var overlay = document.getElementById('goal-celebration-overlay');
     var panel = document.getElementById('goal-celebration-panel');
+    var badge = document.getElementById('goal-badge-image');
     if (!overlay || !panel || !player) return;
 
     clearGoalCelebrationTimers();
     overlay.style.background = getCelebrationPalette(player.skin).overlay;
     applyCelebrationSkin('goal-celebration-panel', 'goal-skin-image', 'goal-skin-fallback', player.skin, player.username);
+    if (badge) badge.src = GOAL_SIDE_IMAGES[String(sideKey || '1')] || GOAL_SIDE_IMAGES['1'];
     document.getElementById('goal-player-name').textContent = player.username || 'Игрок';
     document.getElementById('goal-title').classList.remove('visible');
     overlay.style.display = 'flex';
@@ -363,9 +375,12 @@ function showResult(result) {
     document.getElementById('result-overlay').style.display = 'flex';
     var w = myNum === result.winner;
     var my = myNum === 1 ? result.player1 : result.player2;
+    var winnerSide = String(result.winner || '1');
+    var winnerImg = document.getElementById('result-winner-image');
     var tl = document.getElementById('result-title');
     document.getElementById('result-overlay').style.background = getCelebrationPalette(my.active_skin).overlay;
     applyCelebrationSkin('result-card', 'result-skin-image', 'result-skin-fallback', my.active_skin, my.username);
+    if (winnerImg) winnerImg.src = WINNER_SIDE_IMAGES[winnerSide] || WINNER_SIDE_IMAGES['1'];
     document.getElementById('result-player-name').textContent = my.username;
     tl.textContent = w ? 'WIN!' : 'ПРОСРАЛ';
     document.getElementById('result-score-p1').textContent = result.score[0];
@@ -496,7 +511,7 @@ function initGame() {
             }
             score = [state.score[0], state.score[1]];
             if (scorerKey && state.players && state.players[scorerKey]) {
-                showGoalCelebration(state.players[scorerKey]);
+                showGoalCelebration(state.players[scorerKey], scorerKey);
             }
         }
 
@@ -750,11 +765,29 @@ function render() {
     }
 
     var px = tx(drawPuck.x), py = ty(drawPuck.y), pr = PKR * fs;
-    ctx.beginPath(); ctx.arc(px + 2, py + 3, pr, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fillStyle = '#1a1a2e'; ctx.fill();
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(px - pr * .25, py - pr * .25, pr * .3, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py + pr * 0.34, pr * 0.96, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fillStyle = '#101010';
+    ctx.fill();
+    ctx.strokeStyle = '#060606';
+    ctx.lineWidth = Math.max(1.5, fs * 1.6);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(px, py, pr * 0.78, 0, Math.PI * 2);
+    ctx.fillStyle = '#272729';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, pr * 0.58, 0, Math.PI * 2);
+    ctx.fillStyle = '#343438';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px - pr * 0.2, py - pr * 0.2, pr * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fill();
 
     var myN = String(myNum), enN = myNum === 1 ? '2' : '1';
     drawPad(tx(drawEnemy.x), ty(drawEnemy.y), PR * fs, enN, false, fs);
